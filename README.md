@@ -15,7 +15,11 @@ Phase 1 is complete: repository foundation, boot experience, Friend selection, a
 3. Research Mission vertical slice (complete with demo agent)
 4. Progression, economic ledger, and receipts (complete with per-Friend local persistence)
 5. Real AI and wallet enhancements (Responses API endpoint, offline fallback, and optional Robinhood wallet connection complete)
-6. Testing, deployment, recording, and Vibeathon submission
+6. Testing, deployment, and Vibeathon submission (complete)
+
+## Public preview
+
+The deployment workflow publishes the static, offline-capable build to `https://dingufira88.github.io/friendos/` after the production build and browser tests pass.
 
 The release gate is one complete interaction: select a Friend, run a Research Mission, spend simulated RF, receive a result, earn XP and CRED, and save the receipt.
 
