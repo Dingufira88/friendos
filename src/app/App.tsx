@@ -1,15 +1,39 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { demoFriends } from '../friend/demoFriends'
 import { createFriendIdentity } from '../friend/identity'
 import type { FriendIdentity } from '../friend/types'
+import { createDemoReport } from '../missions/demoAgent'
+import { executionSteps, missions, researchMission } from '../missions/definitions'
 
-type Screen = 'boot' | 'selection' | 'profile' | 'command'
+type Screen = 'boot' | 'selection' | 'profile' | 'command' | 'missions' | 'review' | 'execution' | 'result'
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedId, setSelectedId] = useState(demoFriends[0].tokenId)
+  const [request, setRequest] = useState('Research Rare Friends and explain the best opportunities for developers.')
+  const [step, setStep] = useState(0)
+  const [missionComplete, setMissionComplete] = useState(false)
   const identities = useMemo(() => demoFriends.map(createFriendIdentity), [])
   const selected = identities.find((friend) => friend.tokenId === selectedId) ?? identities[0]
+  const report = useMemo(() => createDemoReport(request), [request])
+
+  useEffect(() => {
+    if (screen !== 'execution') return
+    if (step >= executionSteps.length - 1) {
+      const completeTimer = window.setTimeout(() => {
+        setMissionComplete(true)
+        setScreen('result')
+      }, 900)
+      return () => window.clearTimeout(completeTimer)
+    }
+    const timer = window.setTimeout(() => setStep((current) => current + 1), 760)
+    return () => window.clearTimeout(timer)
+  }, [screen, step])
+
+  function startMission() {
+    setStep(0)
+    setScreen('execution')
+  }
 
   return (
     <main className="boot-shell">
@@ -81,31 +105,31 @@ export function App() {
 
           <div className="command-layout">
             <aside className="stat-stack">
-              <Stat label="Level" value="01" detail="0 / 100 XP" />
-              <Stat label="CRED" value="0" detail="Reputation" />
-              <Stat label="Missions" value="0" detail="Completed" />
+              <Stat label="Level" value="01" detail={`${missionComplete ? 50 : 0} / 100 XP`} />
+              <Stat label="CRED" value={missionComplete ? '3' : '0'} detail="Reputation" />
+              <Stat label="Missions" value={missionComplete ? '1' : '0'} detail="Completed" />
             </aside>
 
             <div className="operator-bay">
               <div className="scan-ring"><div className="operator-mark"><span>{selected.glyph}</span></div></div>
               <p>{selected.archetype} // {selected.primarySkill}</p>
-              <div className="xp-track"><span /></div>
+              <div className="xp-track"><span style={{ width: missionComplete ? '50%' : '4%' }} /></div>
             </div>
 
             <aside className="wallet-card">
               <p>OPERATING BUDGET</p>
-              <strong>100 <small>RF</small></strong>
+              <strong>{missionComplete ? 95 : 100} <small>RF</small></strong>
               <span>SIMULATED BALANCE</span>
               <hr />
               <dl>
-                <div><dt>Spent</dt><dd>0 RF</dd></div>
-                <div><dt>Burned</dt><dd>0 RF</dd></div>
+                <div><dt>Spent</dt><dd>{missionComplete ? 5 : 0} RF</dd></div>
+                <div><dt>Burned</dt><dd>{missionComplete ? 2.5 : 0} RF</dd></div>
               </dl>
             </aside>
           </div>
 
           <nav className="module-grid" aria-label="FriendOS modules">
-            <button type="button"><span>01</span><strong>MISSIONS</strong><small>Assign useful work</small></button>
+            <button type="button" onClick={() => setScreen('missions')}><span>01</span><strong>MISSIONS</strong><small>Assign useful work</small></button>
             <button type="button" disabled><span>02</span><strong>SKILLS</strong><small>Coming soon</small></button>
             <button type="button" disabled><span>03</span><strong>MEMORY</strong><small>Coming soon</small></button>
             <button type="button" onClick={() => setScreen('profile')}><span>04</span><strong>PROFILE</strong><small>Identity core</small></button>
@@ -117,8 +141,90 @@ export function App() {
           </footer>
         </section>
       )}
+
+      {screen === 'missions' && (
+        <section className="mission-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
+          <PanelHeader eyebrow="MISSION DIRECTORY // DEMO MODE" title="ASSIGN USEFUL WORK" onBack={() => setScreen('command')} />
+          <div className="mission-list">
+            {missions.map((mission) => (
+              <button key={mission.id} type="button" disabled={!mission.available} onClick={() => setScreen('review')}>
+                <span className="mission-code">{mission.id.slice(0, 3).toUpperCase()}</span>
+                <span><strong>{mission.name}</strong><small>{mission.description}</small></span>
+                <span className="mission-price">{mission.rfCost} RF<small>{mission.available ? `+${mission.xpReward} XP · +${mission.credReward} CRED` : 'COMING SOON'}</small></span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {screen === 'review' && (
+        <section className="mission-panel review-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
+          <PanelHeader eyebrow="RESEARCH MISSION // INPUT" title="WHAT SHOULD YOUR FRIEND INVESTIGATE?" onBack={() => setScreen('missions')} />
+          <label htmlFor="research-request">Mission brief</label>
+          <textarea id="research-request" value={request} onChange={(event) => setRequest(event.target.value)} maxLength={500} />
+          <div className="cost-review">
+            <div><span>Operator</span><strong>{selected.name} #{selected.tokenId}</strong></div>
+            <div><span>Mission cost</span><strong>5 RF</strong></div>
+            <div><span>Proposed burn</span><strong>2.5 RF</strong></div>
+            <div><span>Rewards</span><strong>+50 XP · +3 CRED</strong></div>
+          </div>
+          <p className="disclosure">SIMULATED ECONOMY — NO ON-CHAIN TRANSACTION WILL OCCUR.</p>
+          <button type="button" onClick={startMission} disabled={!request.trim()}>AUTHORIZE 5 RF &amp; BEGIN</button>
+        </section>
+      )}
+
+      {screen === 'execution' && (
+        <section className="execution-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
+          <p className="eyebrow">MISSION ACTIVE // RESEARCH</p>
+          <div className="working-operator"><div className="operator-mark"><span>{selected.glyph}</span></div><i /></div>
+          <h2>{selected.name} IS WORKING</h2>
+          <div className="execution-list">
+            {executionSteps.map((label, index) => (
+              <div key={label} className={index < step ? 'done' : index === step ? 'active' : ''}>
+                <span>{index < step ? '✓' : index === step ? '●' : '○'}</span>{label}
+              </div>
+            ))}
+          </div>
+          <small>Please keep FriendOS open while the operator completes this mission.</small>
+        </section>
+      )}
+
+      {screen === 'result' && (
+        <section className="result-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
+          <PanelHeader eyebrow="MISSION 00001 // COMPLETE" title="RESEARCH REPORT" onBack={() => setScreen('command')} />
+          <div className="result-layout">
+            <article>
+              <h3>Executive summary</h3><p>{report.summary}</p>
+              <ReportList title="Key findings" items={report.findings} />
+              <ReportList title="Opportunities" items={report.opportunities} />
+              <ReportList title="Recommended next actions" items={report.nextActions} />
+            </article>
+            <aside className="receipt">
+              <p>FRIENDOS MISSION RECEIPT</p>
+              <strong>{selected.name} #{selected.tokenId}</strong>
+              <dl>
+                <div><dt>RF spent</dt><dd>5 RF</dd></div>
+                <div><dt>RF burned</dt><dd>2.5 RF</dd></div>
+                <div><dt>Compute</dt><dd>2 RF</dd></div>
+                <div><dt>Ecosystem</dt><dd>0.5 RF</dd></div>
+                <div><dt>XP</dt><dd>+50</dd></div>
+                <div><dt>CRED</dt><dd>+3</dd></div>
+              </dl>
+              <small>SIMULATED · NO ON-CHAIN TRANSACTION</small>
+            </aside>
+          </div>
+        </section>
+      )}
     </main>
   )
+}
+
+function PanelHeader({ eyebrow, title, onBack }: { eyebrow: string; title: string; onBack: () => void }) {
+  return <header className="panel-header"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><button className="secondary" type="button" onClick={onBack}>BACK</button></header>
+}
+
+function ReportList({ title, items }: { title: string; items: string[] }) {
+  return <section><h3>{title}</h3><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></section>
 }
 
 function Stat({ label, value, detail }: { label: string; value: string; detail: string }) {
