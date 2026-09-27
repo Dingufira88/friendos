@@ -6,36 +6,22 @@ test.beforeEach(async ({ page }) => {
   await page.reload()
 })
 
-test('completes the core Research Mission and saves its receipt', async ({ page }, testInfo) => {
-  await page.getByRole('button', { name: 'MEET YOUR OPERATOR' }).click()
-  await expect(page.getByRole('heading', { name: 'Choose your operator' })).toBeVisible()
-  await page.getByRole('button', { name: 'CHOOSE SIGNAL' }).click()
-  await page.getByRole('button', { name: /ENTER SIGNAL’S HOME/ }).click()
-  await page.getByRole('button', { name: /MISSIONS/ }).click()
-  await page.getByRole('button', { name: /Research Mission/ }).click()
-  await page.getByLabel('Tell your Friend what you need').fill('Explain the strongest opportunities for builders in Rare Friends.')
-  await page.getByRole('button', { name: /SEND SIGNAL TO WORK/ }).click()
-
+test('completes a Research Mission from the unified workspace', async ({ page }, testInfo) => {
+  await expect(page.getByRole('heading', { name: 'Meet your new operator.' })).toBeVisible()
+  await page.getByLabel('Tell your Friend what you need').fill('Explain the strongest opportunities for Rare Friends builders.')
+  await page.getByRole('button', { name: /Launch mission/ }).click()
   await expect(page.getByRole('heading', { name: 'Signal is on it.' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Here’s what Signal found' })).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText('FOS-48321-0001 // COMPLETE', { exact: true })).toBeVisible()
-  await expect(page.getByText('2.5 RF', { exact: true })).toBeVisible()
-
-  if (testInfo.project.name === 'desktop-chromium') {
-    await page.screenshot({ path: 'artifacts/friendos-research-result.png', fullPage: true })
-  }
-
-  await page.getByRole('button', { name: '← RETURN' }).click()
-  await expect(page.getByText('95 RF', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /ACTIVITY/ }).click()
-  await expect(page.getByText('FOS-48321-0001', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Here’s what Signal found.' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('FOS-48321-0001 / COMPLETE', { exact: true })).toBeVisible()
+  if (testInfo.project.name === 'desktop-chromium') await page.screenshot({ path: 'artifacts/friendos-research-result.png', fullPage: true })
+  await page.getByRole('button', { name: /Return to workspace/ }).click()
+  await expect(page.locator('.history-list article').filter({ hasText: 'FOS-48321-0001' })).toBeVisible()
 })
 
-test('provides a return path from every pre-mission screen', async ({ page }) => {
-  await page.getByRole('button', { name: 'MEET YOUR OPERATOR' }).click()
-  await page.getByRole('button', { name: 'CHOOSE SIGNAL' }).click()
-  await page.getByRole('button', { name: '← Back to your Friends' }).click()
-  await expect(page.getByRole('heading', { name: 'Choose your operator' })).toBeVisible()
-  await page.getByRole('button', { name: '← RETURN HOME' }).click()
-  await expect(page.getByRole('heading', { name: /Your Rare Friend can/ })).toBeVisible()
+test('switches Friends and navigates the single-page sections', async ({ page }) => {
+  await page.getByRole('button', { name: /Switch Friend/ }).click()
+  await page.getByRole('button', { name: /Nova/ }).click()
+  await expect(page.getByRole('heading', { name: /Nova/ })).toBeVisible()
+  await page.getByRole('heading', { name: /Mission history/ }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('heading', { name: /Mission history/ })).toBeVisible()
 })
