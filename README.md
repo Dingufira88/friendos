@@ -11,7 +11,7 @@ Phase 1 is complete: repository foundation, boot experience, Friend selection, a
 ## Product phases
 
 1. Foundation and Friend selection
-2. Command Center
+2. Command Center (complete)
 3. Research Mission vertical slice
 4. Progression, economic ledger, and receipts
 5. Real AI and wallet enhancements
