@@ -6,7 +6,7 @@ FriendOS turns a Rare Friends Generations NFT into an AI-powered operator with a
 
 ## Status
 
-Phase 1 is in progress: repository foundation, boot experience, Friend selection, and deterministic identity.
+Phase 1 is complete: repository foundation, boot experience, Friend selection, and deterministic identity.
 
 ## Product phases
 
