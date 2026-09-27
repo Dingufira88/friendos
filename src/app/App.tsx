@@ -4,34 +4,42 @@ import { createFriendIdentity } from '../friend/identity'
 import type { FriendIdentity } from '../friend/types'
 import { createDemoReport } from '../missions/demoAgent'
 import { executionSteps, missions, researchMission } from '../missions/definitions'
+import { initialProgress, levelFromXp, useProgressionStore, type MissionRecord } from '../progression/store'
 
-type Screen = 'boot' | 'selection' | 'profile' | 'command' | 'missions' | 'review' | 'execution' | 'result'
+type Screen = 'boot' | 'selection' | 'profile' | 'command' | 'missions' | 'review' | 'execution' | 'result' | 'activity'
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('boot')
   const [selectedId, setSelectedId] = useState(demoFriends[0].tokenId)
   const [request, setRequest] = useState('Research Rare Friends and explain the best opportunities for developers.')
   const [step, setStep] = useState(0)
-  const [missionComplete, setMissionComplete] = useState(false)
+  const [activeReceipt, setActiveReceipt] = useState<MissionRecord | null>(null)
+  const friendsProgress = useProgressionStore((state) => state.friends)
+  const completeMission = useProgressionStore((state) => state.completeMission)
+  const resetFriend = useProgressionStore((state) => state.resetFriend)
   const identities = useMemo(() => demoFriends.map(createFriendIdentity), [])
   const selected = identities.find((friend) => friend.tokenId === selectedId) ?? identities[0]
+  const progress = friendsProgress[selected.tokenId] ?? initialProgress()
+  const level = levelFromXp(progress.xp)
   const report = useMemo(() => createDemoReport(request), [request])
 
   useEffect(() => {
     if (screen !== 'execution') return
     if (step >= executionSteps.length - 1) {
       const completeTimer = window.setTimeout(() => {
-        setMissionComplete(true)
+        const receipt = completeMission(selected.tokenId, request)
+        setActiveReceipt(receipt)
         setScreen('result')
       }, 900)
       return () => window.clearTimeout(completeTimer)
     }
     const timer = window.setTimeout(() => setStep((current) => current + 1), 760)
     return () => window.clearTimeout(timer)
-  }, [screen, step])
+  }, [completeMission, request, screen, selected.tokenId, step])
 
   function startMission() {
     setStep(0)
+    setActiveReceipt(null)
     setScreen('execution')
   }
 
@@ -86,7 +94,7 @@ export function App() {
           <dl>
             <div><dt>Primary skill</dt><dd>{selected.primarySkill}</dd></div>
             <div><dt>Secondary skill</dt><dd>{selected.secondarySkill}</dd></div>
-            <div><dt>RF balance</dt><dd>100 RF <small>SIMULATED</small></dd></div>
+            <div><dt>RF balance</dt><dd>{progress.balance} RF <small>SIMULATED</small></dd></div>
           </dl>
           <button type="button" onClick={() => setScreen('command')}>ENTER COMMAND CENTER</button>
           <button className="text-button" type="button" onClick={() => setScreen('selection')}>Choose another operator</button>
@@ -105,25 +113,25 @@ export function App() {
 
           <div className="command-layout">
             <aside className="stat-stack">
-              <Stat label="Level" value="01" detail={`${missionComplete ? 50 : 0} / 100 XP`} />
-              <Stat label="CRED" value={missionComplete ? '3' : '0'} detail="Reputation" />
-              <Stat label="Missions" value={missionComplete ? '1' : '0'} detail="Completed" />
+              <Stat label="Level" value={String(level.level).padStart(2, '0')} detail={`${progress.xp} / ${level.nextCeiling} XP`} />
+              <Stat label="CRED" value={String(progress.cred)} detail="Reputation" />
+              <Stat label="Missions" value={String(progress.missionCount)} detail="Completed" />
             </aside>
 
             <div className="operator-bay">
               <div className="scan-ring"><div className="operator-mark"><span>{selected.glyph}</span></div></div>
               <p>{selected.archetype} // {selected.primarySkill}</p>
-              <div className="xp-track"><span style={{ width: missionComplete ? '50%' : '4%' }} /></div>
+              <div className="xp-track"><span style={{ width: `${Math.max(4, level.percent)}%` }} /></div>
             </div>
 
             <aside className="wallet-card">
               <p>OPERATING BUDGET</p>
-              <strong>{missionComplete ? 95 : 100} <small>RF</small></strong>
+              <strong>{progress.balance} <small>RF</small></strong>
               <span>SIMULATED BALANCE</span>
               <hr />
               <dl>
-                <div><dt>Spent</dt><dd>{missionComplete ? 5 : 0} RF</dd></div>
-                <div><dt>Burned</dt><dd>{missionComplete ? 2.5 : 0} RF</dd></div>
+                <div><dt>Spent</dt><dd>{progress.rfSpent} RF</dd></div>
+                <div><dt>Burned</dt><dd>{progress.rfBurned} RF</dd></div>
               </dl>
             </aside>
           </div>
@@ -131,7 +139,7 @@ export function App() {
           <nav className="module-grid" aria-label="FriendOS modules">
             <button type="button" onClick={() => setScreen('missions')}><span>01</span><strong>MISSIONS</strong><small>Assign useful work</small></button>
             <button type="button" disabled><span>02</span><strong>SKILLS</strong><small>Coming soon</small></button>
-            <button type="button" disabled><span>03</span><strong>MEMORY</strong><small>Coming soon</small></button>
+            <button type="button" onClick={() => setScreen('activity')}><span>03</span><strong>ACTIVITY</strong><small>Mission ledger</small></button>
             <button type="button" onClick={() => setScreen('profile')}><span>04</span><strong>PROFILE</strong><small>Identity core</small></button>
           </nav>
 
@@ -139,6 +147,36 @@ export function App() {
             <span>DEMO MODE // NO ON-CHAIN TRANSACTIONS</span>
             <button className="text-button" type="button" onClick={() => setScreen('selection')}>Switch operator</button>
           </footer>
+        </section>
+      )}
+
+      {screen === 'activity' && (
+        <section className="mission-panel activity-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
+          <PanelHeader eyebrow="PERSISTENT MEMORY // LOCAL" title="ACTIVITY LEDGER" onBack={() => setScreen('command')} />
+          <div className="ledger-summary">
+            <Stat label="Lifetime spent" value={`${progress.rfSpent} RF`} detail={`${progress.missionCount} missions`} />
+            <Stat label="Lifetime burned" value={`${progress.rfBurned} RF`} detail="50% allocation" />
+            <Stat label="CRED earned" value={String(progress.cred)} detail="Non-transferable" />
+          </div>
+          {progress.history.length === 0 ? (
+            <div className="empty-ledger"><strong>NO MISSIONS RECORDED</strong><p>Complete a Research Mission to create this Friend’s first permanent receipt.</p></div>
+          ) : (
+            <div className="ledger-list">
+              {progress.history.map((record) => (
+                <article key={record.receiptId}>
+                  <div><strong>{record.missionName}</strong><span>{record.receiptId}</span></div>
+                  <p>{record.request}</p>
+                  <div><span>{new Date(record.completedAt).toLocaleString()}</span><strong>-{record.rfSpent} RF · +{record.xpEarned} XP · +{record.credEarned} CRED</strong></div>
+                </article>
+              ))}
+            </div>
+          )}
+          <button className="danger-button" type="button" onClick={() => {
+            if (window.confirm(`Reset all local FriendOS progress for ${selected.name} #${selected.tokenId}?`)) {
+              resetFriend(selected.tokenId)
+              setActiveReceipt(null)
+            }
+          }}>RESET THIS FRIEND’S DEMO DATA</button>
         </section>
       )}
 
@@ -168,8 +206,8 @@ export function App() {
             <div><span>Proposed burn</span><strong>2.5 RF</strong></div>
             <div><span>Rewards</span><strong>+50 XP · +3 CRED</strong></div>
           </div>
-          <p className="disclosure">SIMULATED ECONOMY — NO ON-CHAIN TRANSACTION WILL OCCUR.</p>
-          <button type="button" onClick={startMission} disabled={!request.trim()}>AUTHORIZE 5 RF &amp; BEGIN</button>
+          <p className="disclosure">{progress.balance < researchMission.rfCost ? 'INSUFFICIENT SIMULATED RF — RESET THIS FRIEND FROM THE ACTIVITY LEDGER.' : 'SIMULATED ECONOMY — NO ON-CHAIN TRANSACTION WILL OCCUR.'}</p>
+          <button type="button" onClick={startMission} disabled={!request.trim() || progress.balance < researchMission.rfCost}>AUTHORIZE 5 RF &amp; BEGIN</button>
         </section>
       )}
 
@@ -210,7 +248,7 @@ export function App() {
                 <div><dt>XP</dt><dd>+50</dd></div>
                 <div><dt>CRED</dt><dd>+3</dd></div>
               </dl>
-              <small>SIMULATED · NO ON-CHAIN TRANSACTION</small>
+              <small>{activeReceipt?.receiptId ?? 'FOS-DEMO'} · SIMULATED · NO ON-CHAIN TRANSACTION</small>
             </aside>
           </div>
         </section>

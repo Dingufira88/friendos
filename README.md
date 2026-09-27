@@ -13,7 +13,7 @@ Phase 1 is complete: repository foundation, boot experience, Friend selection, a
 1. Foundation and Friend selection
 2. Command Center (complete)
 3. Research Mission vertical slice (complete with demo agent)
-4. Progression, economic ledger, and receipts
+4. Progression, economic ledger, and receipts (complete with per-Friend local persistence)
 5. Real AI and wallet enhancements
 6. Testing, deployment, recording, and Vibeathon submission
 
