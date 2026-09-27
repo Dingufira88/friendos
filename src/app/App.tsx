@@ -4,8 +4,11 @@ import { demoFriends } from '../friend/demoFriends'
 import { createFriendIdentity } from '../friend/identity'
 import type { FriendIdentity } from '../friend/types'
 import { createDemoReport } from '../missions/demoAgent'
+import type { ResearchReport } from '../missions/demoAgent'
 import { executionSteps, missions, researchMission } from '../missions/definitions'
 import { initialProgress, levelFromXp, useProgressionStore, type MissionRecord } from '../progression/store'
+import { executeResearchMission, type AgentSource } from '../agents/provider'
+import { useWallet } from '../wallet/useWallet'
 
 type Screen = 'boot' | 'selection' | 'profile' | 'command' | 'missions' | 'review' | 'execution' | 'result' | 'activity'
 
@@ -22,6 +25,10 @@ export function App() {
   const [request, setRequest] = useState('Research Rare Friends and explain the best opportunities for developers.')
   const [step, setStep] = useState(0)
   const [activeReceipt, setActiveReceipt] = useState<MissionRecord | null>(null)
+  const [report, setReport] = useState<ResearchReport>(() => createDemoReport(request))
+  const [agentSource, setAgentSource] = useState<AgentSource>('fallback')
+  const [agentReady, setAgentReady] = useState(false)
+  const wallet = useWallet()
   const friendsProgress = useProgressionStore((state) => state.friends)
   const completeMission = useProgressionStore((state) => state.completeMission)
   const resetFriend = useProgressionStore((state) => state.resetFriend)
@@ -29,11 +36,10 @@ export function App() {
   const selected = identities.find((friend) => friend.tokenId === selectedId) ?? identities[0]
   const progress = friendsProgress[selected.tokenId] ?? initialProgress()
   const level = levelFromXp(progress.xp)
-  const report = useMemo(() => createDemoReport(request), [request])
 
   useEffect(() => {
     if (screen !== 'execution') return
-    if (step >= executionSteps.length - 1) {
+    if (step >= executionSteps.length - 1 && agentReady) {
       const completeTimer = window.setTimeout(() => {
         const receipt = completeMission(selected.tokenId, request)
         setActiveReceipt(receipt)
@@ -43,12 +49,18 @@ export function App() {
     }
     const timer = window.setTimeout(() => setStep((current) => current + 1), 760)
     return () => window.clearTimeout(timer)
-  }, [completeMission, request, screen, selected.tokenId, step])
+  }, [agentReady, completeMission, request, screen, selected.tokenId, step])
 
   function startMission() {
     setStep(0)
+    setAgentReady(false)
     setActiveReceipt(null)
     setScreen('execution')
+    void executeResearchMission(request, selected).then((result) => {
+      setReport(result.report)
+      setAgentSource(result.source)
+      setAgentReady(true)
+    })
   }
 
   return (
@@ -116,7 +128,11 @@ export function App() {
               <p className="eyebrow">{selected.name.toUpperCase()}’S HOME</p>
               <strong>{selected.name} <span>#{selected.tokenId}</span></strong>
             </div>
-            <div className="status"><i /> OPERATOR ONLINE</div>
+            <div className="wallet-connect">
+              {wallet.account ? <span>{wallet.account.slice(0, 6)}…{wallet.account.slice(-4)} · {wallet.isRobinhood ? 'ROBINHOOD' : 'WRONG NETWORK'}</span> : null}
+              <button type="button" onClick={wallet.connect} disabled={wallet.connecting}>{wallet.account ? 'RECONNECT' : wallet.connecting ? 'CONNECTING…' : 'CONNECT WALLET'}</button>
+              {wallet.error && <small>{wallet.error}</small>}
+            </div>
           </header>
 
           <div className="command-layout">
@@ -257,7 +273,7 @@ export function App() {
                 <div><dt>XP</dt><dd>+50</dd></div>
                 <div><dt>CRED</dt><dd>+3</dd></div>
               </dl>
-              <small>{activeReceipt?.receiptId ?? 'FRIENDOS RECEIPT'}</small>
+              <small>{activeReceipt?.receiptId ?? 'FRIENDOS RECEIPT'} · {agentSource === 'openai' ? 'AI REPORT' : 'OFFLINE REPORT'}</small>
             </aside>
           </div>
         </motion.section>

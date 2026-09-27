@@ -14,7 +14,7 @@ Phase 1 is complete: repository foundation, boot experience, Friend selection, a
 2. Command Center (complete)
 3. Research Mission vertical slice (complete with demo agent)
 4. Progression, economic ledger, and receipts (complete with per-Friend local persistence)
-5. Real AI and wallet enhancements
+5. Real AI and wallet enhancements (Responses API endpoint, offline fallback, and optional Robinhood wallet connection complete)
 6. Testing, deployment, recording, and Vibeathon submission
 
 The release gate is one complete interaction: select a Friend, run a Research Mission, spend simulated RF, receive a result, earn XP and CRED, and save the receipt.
@@ -27,6 +27,8 @@ Requires Node.js 22 or newer.
 npm install
 npm run dev
 ```
+
+Local Vite development always uses the offline report fallback. Deploy with a serverless host that supports the `/api/mission` function and set `OPENAI_API_KEY` to enable live reports. See `.env.example`; never expose the key with a `VITE_` prefix.
 
 ## Economy disclosure
 

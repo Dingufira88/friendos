@@ -71,6 +71,10 @@ button { font: inherit; }
 .command-header strong span { color: #718397; font-weight: 400; }
 .status { color: #9fb4c6; font-size: .76rem; letter-spacing: .1em; }
 .status i { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--operator-color); box-shadow: 0 0 12px var(--operator-color); }
+.wallet-connect { display: grid; justify-items: end; gap: 5px; }
+.wallet-connect > span { color: #91a5b8; font-size: .7rem; }
+.wallet-connect button { padding: 8px 11px; font-size: .66rem; box-shadow: none; }
+.wallet-connect small { max-width: 260px; margin: 0; color: #f1a1a1; text-align: right; }
 
 .command-layout { display: grid; grid-template-columns: 180px 1fr 230px; align-items: center; gap: 26px; min-height: 360px; }
 .stat-stack { display: grid; gap: 10px; }
@@ -265,6 +269,7 @@ small { display: block; margin-top: 18px; color: #718397; }
   .selection-actions button { width: 100%; }
   .command-panel { min-height: 100vh; width: 100%; border: 0; }
   .command-header { align-items: flex-start; }
+  .wallet-connect { justify-items: end; }
   .status { text-align: right; }
   .command-layout { grid-template-columns: 1fr; padding: 28px 0; }
   .stat-stack { grid-template-columns: repeat(3, 1fr); order: 2; }
