@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { demoFriends } from '../friend/demoFriends'
 import { createFriendIdentity } from '../friend/identity'
 import type { FriendIdentity } from '../friend/types'
@@ -7,6 +8,13 @@ import { executionSteps, missions, researchMission } from '../missions/definitio
 import { initialProgress, levelFromXp, useProgressionStore, type MissionRecord } from '../progression/store'
 
 type Screen = 'boot' | 'selection' | 'profile' | 'command' | 'missions' | 'review' | 'execution' | 'result' | 'activity'
+
+const pageMotion = {
+  initial: { opacity: 0, y: 18, scale: 0.985 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -12, scale: 0.99 },
+  transition: { duration: 0.36, ease: 'easeOut' as const },
+}
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('boot')
@@ -46,22 +54,22 @@ export function App() {
   return (
     <main className="boot-shell">
       <div className="grid" aria-hidden="true" />
+      <AnimatePresence mode="wait">
       {screen === 'boot' && (
-        <section className="boot-panel">
-          <p className="eyebrow">RARE FRIENDS // OPERATOR SYSTEM</p>
-          <h1>FRIEND<span>OS</span></h1>
-          <p className="tagline">Your Friend can think.<br />Your Friend can work.<br />Your Friend can spend.</p>
-          <button type="button" onClick={() => setScreen('selection')}>ENTER DEMO MODE</button>
-          <small>Simulated economy · No on-chain transactions</small>
-        </section>
+        <motion.section key="boot" className="boot-panel" {...pageMotion}>
+          <p className="eyebrow">RARE FRIENDS // FRIEND OS</p>
+          <h1>Your Rare Friend can <span>think, work and spend.</span></h1>
+          <p className="tagline">Give your Friend a mission. Watch it grow with every useful thing it does.</p>
+          <button type="button" onClick={() => setScreen('selection')}>MEET YOUR OPERATOR</button>
+        </motion.section>
       )}
 
       {screen === 'selection' && (
-        <section className="selection-panel">
+        <motion.section key="selection" className="selection-panel" {...pageMotion}>
           <header>
-            <p className="eyebrow">IDENTITY HANDSHAKE // DEMO MODE</p>
-            <h2>CHOOSE YOUR OPERATOR</h2>
-            <p>Each token produces the same identity every time.</p>
+            <p className="eyebrow">YOUR RARE FRIENDS</p>
+            <h2>Choose your operator</h2>
+            <p>Every Friend has its own personality, skills and history.</p>
           </header>
           <div className="friend-grid">
             {identities.map((friend) => (
@@ -74,19 +82,19 @@ export function App() {
             ))}
           </div>
           <div className="selection-actions">
-            <button className="secondary" type="button" onClick={() => setScreen('boot')}>BACK</button>
-            <button type="button" onClick={() => setScreen('profile')}>INITIALIZE {selected.name.toUpperCase()}</button>
+            <button className="secondary" type="button" onClick={() => setScreen('boot')}>← RETURN HOME</button>
+            <button type="button" onClick={() => setScreen('profile')}>CHOOSE {selected.name.toUpperCase()}</button>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {screen === 'profile' && (
-        <section className="profile-panel">
+        <motion.section key="profile" className="profile-panel" {...pageMotion}>
           <div className="operator-mark" style={{ '--operator-color': selected.color } as React.CSSProperties}>
             <span>{selected.glyph}</span>
           </div>
-          <p className="eyebrow">OPERATOR ONLINE // GEN {selected.generation}</p>
-          <h2>{selected.name} <em>#{selected.tokenId}</em></h2>
+          <p className="eyebrow">GENERATION {selected.generation} // RARE FRIEND</p>
+          <h2>Meet {selected.name} <em>#{selected.tokenId}</em></h2>
           <p className="archetype">{selected.archetype}</p>
           <div className="trait-row">
             {selected.traits.map((trait) => <span key={trait}>{trait}</span>)}
@@ -94,18 +102,18 @@ export function App() {
           <dl>
             <div><dt>Primary skill</dt><dd>{selected.primarySkill}</dd></div>
             <div><dt>Secondary skill</dt><dd>{selected.secondarySkill}</dd></div>
-            <div><dt>RF balance</dt><dd>{progress.balance} RF <small>SIMULATED</small></dd></div>
+            <div><dt>RF balance</dt><dd>{progress.balance} RF</dd></div>
           </dl>
-          <button type="button" onClick={() => setScreen('command')}>ENTER COMMAND CENTER</button>
-          <button className="text-button" type="button" onClick={() => setScreen('selection')}>Choose another operator</button>
-        </section>
+          <button type="button" onClick={() => setScreen('command')}>ENTER {selected.name.toUpperCase()}’S HOME</button>
+          <button className="text-button" type="button" onClick={() => setScreen('selection')}>← Back to your Friends</button>
+        </motion.section>
       )}
 
       {screen === 'command' && (
-        <section className="command-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
+        <motion.section key="command" className="command-panel" style={{ '--operator-color': selected.color } as React.CSSProperties} {...pageMotion}>
           <header className="command-header">
             <div>
-              <p className="eyebrow">FRIENDOS // COMMAND CENTER</p>
+              <p className="eyebrow">{selected.name.toUpperCase()}’S HOME</p>
               <strong>{selected.name} <span>#{selected.tokenId}</span></strong>
             </div>
             <div className="status"><i /> OPERATOR ONLINE</div>
@@ -127,7 +135,7 @@ export function App() {
             <aside className="wallet-card">
               <p>OPERATING BUDGET</p>
               <strong>{progress.balance} <small>RF</small></strong>
-              <span>SIMULATED BALANCE</span>
+              <span>AVAILABLE TO SPEND</span>
               <hr />
               <dl>
                 <div><dt>Spent</dt><dd>{progress.rfSpent} RF</dd></div>
@@ -144,15 +152,15 @@ export function App() {
           </nav>
 
           <footer className="command-footer">
-            <span>DEMO MODE // NO ON-CHAIN TRANSACTIONS</span>
-            <button className="text-button" type="button" onClick={() => setScreen('selection')}>Switch operator</button>
+            <span>FRIENDS HAVE WALLETS. WALLETS HAVE FRIENDS.</span>
+            <button className="text-button" type="button" onClick={() => setScreen('selection')}>← Back to your Friends</button>
           </footer>
-        </section>
+        </motion.section>
       )}
 
       {screen === 'activity' && (
-        <section className="mission-panel activity-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
-          <PanelHeader eyebrow="PERSISTENT MEMORY // LOCAL" title="ACTIVITY LEDGER" onBack={() => setScreen('command')} />
+        <motion.section key="activity" className="mission-panel activity-panel" style={{ '--operator-color': selected.color } as React.CSSProperties} {...pageMotion}>
+          <PanelHeader eyebrow={`${selected.name.toUpperCase()}’S MEMORY`} title="What your Friend has done" onBack={() => setScreen('command')} />
           <div className="ledger-summary">
             <Stat label="Lifetime spent" value={`${progress.rfSpent} RF`} detail={`${progress.missionCount} missions`} />
             <Stat label="Lifetime burned" value={`${progress.rfBurned} RF`} detail="50% allocation" />
@@ -176,13 +184,13 @@ export function App() {
               resetFriend(selected.tokenId)
               setActiveReceipt(null)
             }
-          }}>RESET THIS FRIEND’S DEMO DATA</button>
-        </section>
+          }}>RESET THIS FRIEND’S HISTORY</button>
+        </motion.section>
       )}
 
       {screen === 'missions' && (
-        <section className="mission-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
-          <PanelHeader eyebrow="MISSION DIRECTORY // DEMO MODE" title="ASSIGN USEFUL WORK" onBack={() => setScreen('command')} />
+        <motion.section key="missions" className="mission-panel" style={{ '--operator-color': selected.color } as React.CSSProperties} {...pageMotion}>
+          <PanelHeader eyebrow="THINGS YOUR FRIEND CAN DO" title="Give your Friend a mission" onBack={() => setScreen('command')} />
           <div className="mission-list">
             {missions.map((mission) => (
               <button key={mission.id} type="button" disabled={!mission.available} onClick={() => setScreen('review')}>
@@ -192,13 +200,13 @@ export function App() {
               </button>
             ))}
           </div>
-        </section>
+        </motion.section>
       )}
 
       {screen === 'review' && (
-        <section className="mission-panel review-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
-          <PanelHeader eyebrow="RESEARCH MISSION // INPUT" title="WHAT SHOULD YOUR FRIEND INVESTIGATE?" onBack={() => setScreen('missions')} />
-          <label htmlFor="research-request">Mission brief</label>
+        <motion.section key="review" className="mission-panel review-panel" style={{ '--operator-color': selected.color } as React.CSSProperties} {...pageMotion}>
+          <PanelHeader eyebrow="RESEARCH MISSION" title={`What should ${selected.name} investigate?`} onBack={() => setScreen('missions')} />
+          <label htmlFor="research-request">Tell your Friend what you need</label>
           <textarea id="research-request" value={request} onChange={(event) => setRequest(event.target.value)} maxLength={500} />
           <div className="cost-review">
             <div><span>Operator</span><strong>{selected.name} #{selected.tokenId}</strong></div>
@@ -206,16 +214,17 @@ export function App() {
             <div><span>Proposed burn</span><strong>2.5 RF</strong></div>
             <div><span>Rewards</span><strong>+50 XP · +3 CRED</strong></div>
           </div>
-          <p className="disclosure">{progress.balance < researchMission.rfCost ? 'INSUFFICIENT SIMULATED RF — RESET THIS FRIEND FROM THE ACTIVITY LEDGER.' : 'SIMULATED ECONOMY — NO ON-CHAIN TRANSACTION WILL OCCUR.'}</p>
-          <button type="button" onClick={startMission} disabled={!request.trim() || progress.balance < researchMission.rfCost}>AUTHORIZE 5 RF &amp; BEGIN</button>
-        </section>
+          {progress.balance < researchMission.rfCost && <p className="disclosure">NOT ENOUGH RF — RESET THIS FRIEND’S HISTORY FROM THE ACTIVITY PAGE.</p>}
+          <button type="button" onClick={startMission} disabled={!request.trim() || progress.balance < researchMission.rfCost}>SEND {selected.name.toUpperCase()} TO WORK · 5 RF</button>
+        </motion.section>
       )}
 
       {screen === 'execution' && (
-        <section className="execution-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
-          <p className="eyebrow">MISSION ACTIVE // RESEARCH</p>
+        <motion.section key="execution" className="execution-panel" style={{ '--operator-color': selected.color } as React.CSSProperties} {...pageMotion}>
+          <button className="execution-back" type="button" onClick={() => setScreen('command')}>← LEAVE MISSION</button>
+          <p className="eyebrow">RESEARCH MISSION IN PROGRESS</p>
           <div className="working-operator"><div className="operator-mark"><span>{selected.glyph}</span></div><i /></div>
-          <h2>{selected.name} IS WORKING</h2>
+          <h2>{selected.name} is on it.</h2>
           <div className="execution-list">
             {executionSteps.map((label, index) => (
               <div key={label} className={index < step ? 'done' : index === step ? 'active' : ''}>
@@ -223,13 +232,13 @@ export function App() {
               </div>
             ))}
           </div>
-          <small>Please keep FriendOS open while the operator completes this mission.</small>
-        </section>
+          <small>Your Friend is turning the mission into something useful.</small>
+        </motion.section>
       )}
 
       {screen === 'result' && (
-        <section className="result-panel" style={{ '--operator-color': selected.color } as React.CSSProperties}>
-          <PanelHeader eyebrow="MISSION 00001 // COMPLETE" title="RESEARCH REPORT" onBack={() => setScreen('command')} />
+        <motion.section key="result" className="result-panel" style={{ '--operator-color': selected.color } as React.CSSProperties} {...pageMotion}>
+          <PanelHeader eyebrow={`${activeReceipt?.receiptId ?? 'MISSION'} // COMPLETE`} title={`Here’s what ${selected.name} found`} onBack={() => setScreen('command')} />
           <div className="result-layout">
             <article>
               <h3>Executive summary</h3><p>{report.summary}</p>
@@ -248,17 +257,19 @@ export function App() {
                 <div><dt>XP</dt><dd>+50</dd></div>
                 <div><dt>CRED</dt><dd>+3</dd></div>
               </dl>
-              <small>{activeReceipt?.receiptId ?? 'FOS-DEMO'} · SIMULATED · NO ON-CHAIN TRANSACTION</small>
+              <small>{activeReceipt?.receiptId ?? 'FRIENDOS RECEIPT'}</small>
             </aside>
           </div>
-        </section>
+        </motion.section>
       )}
+      </AnimatePresence>
+      <footer className="prototype-note">FriendOS is a Vibeathon prototype. RF spending and burns shown here are simulated; no on-chain transaction occurs.</footer>
     </main>
   )
 }
 
 function PanelHeader({ eyebrow, title, onBack }: { eyebrow: string; title: string; onBack: () => void }) {
-  return <header className="panel-header"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><button className="secondary" type="button" onClick={onBack}>BACK</button></header>
+  return <header className="panel-header"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><button className="secondary" type="button" onClick={onBack}>← RETURN</button></header>
 }
 
 function ReportList({ title, items }: { title: string; items: string[] }) {

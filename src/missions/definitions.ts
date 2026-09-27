@@ -22,7 +22,7 @@ export const researchMission = missions.find((mission) => mission.id === 'resear
 
 export const executionSteps = [
   'Authorizing mission',
-  'Spending simulated RF',
+  'Powering the mission with RF',
   'Understanding request',
   'Planning research',
   'Analysing information',
