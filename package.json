@@ -11,21 +11,23 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@rarefriends/friendsdk": "https://github.com/spokesz/friendsdk/releases/download/v0.1.2/rarefriends-friendsdk-0.1.2.tgz",
     "@vitejs/plugin-react": "5.0.4",
-    "vite": "7.1.7",
-    "typescript": "5.9.3",
+    "framer-motion": "12.43.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "framer-motion": "12.43.0",
-    "zustand": "5.0.8",
-    "zod": "4.1.12"
+    "typescript": "5.9.3",
+    "vite": "7.1.7",
+    "zod": "4.1.12",
+    "zustand": "5.0.8"
   },
   "devDependencies": {
     "@eslint/js": "latest",
+    "@playwright/test": "latest",
+    "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/node": "latest",
-    "@playwright/test": "latest",
+    "esbuild": "^0.25.12",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",

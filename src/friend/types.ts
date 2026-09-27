@@ -9,6 +9,9 @@ export interface FriendToken {
   name: string
   color: string
   glyph: string
+  walletAddress?: string
+  familyName?: string
+  spriteRows?: readonly string[]
 }
 
 export interface FriendIdentity extends FriendToken {

@@ -1,73 +1,55 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createFriendPublicClient, createFriendWalletSession, type FriendWalletSnapshot } from '@rarefriends/friendsdk/wallet'
+import { readOwnedFriends } from '@rarefriends/friendsdk/owned'
+import { createGenerationSpriteReader, spriteFrame } from '@rarefriends/friendsdk/sprites'
+import type { FriendToken } from '../friend/types'
 
-const ROBINHOOD_CHAIN_ID = '0x1237'
-const ROBINHOOD_CHAIN = {
-  chainId: ROBINHOOD_CHAIN_ID,
-  chainName: 'Robinhood Chain',
-  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
-  blockExplorerUrls: ['https://robinhoodchain.blockscout.com'],
-}
-
-type EthereumProvider = {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>
-  on?(event: string, listener: (...args: unknown[]) => void): void
-  removeListener?(event: string, listener: (...args: unknown[]) => void): void
-}
-
-declare global { interface Window { ethereum?: EthereumProvider } }
+const accents = ['#69f7d9', '#ffbb55', '#b48cff', '#ff7e9e', '#74a7ff', '#a7ff4f']
+const emptySnapshot: FriendWalletSnapshot = { status: 'unavailable', wallets: [], selectedWalletId: null, account: null, chainId: null, revision: 0, error: null }
 
 export function useWallet() {
-  const [account, setAccount] = useState<string | null>(null)
-  const [chainId, setChainId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [connecting, setConnecting] = useState(false)
-
-  const sync = useCallback(async () => {
-    if (!window.ethereum) return
-    const [accounts, chain] = await Promise.all([
-      window.ethereum.request({ method: 'eth_accounts' }) as Promise<string[]>,
-      window.ethereum.request({ method: 'eth_chainId' }) as Promise<string>,
-    ])
-    setAccount(accounts[0] ?? null)
-    setChainId(chain)
-  }, [])
+  const session = useMemo(() => createFriendWalletSession(), [])
+  const publicClient = useMemo(() => createFriendPublicClient({ batch: true }), [])
+  const spriteReader = useMemo(() => createGenerationSpriteReader(publicClient), [publicClient])
+  const [snapshot, setSnapshot] = useState<FriendWalletSnapshot>(() => session.getSnapshot() ?? emptySnapshot)
+  const [ownedFriends, setOwnedFriends] = useState<FriendToken[]>([])
+  const [loadingFriends, setLoadingFriends] = useState(false)
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
 
   useEffect(() => {
-    void sync()
-    const update = () => void sync()
-    window.ethereum?.on?.('accountsChanged', update)
-    window.ethereum?.on?.('chainChanged', update)
-    return () => {
-      window.ethereum?.removeListener?.('accountsChanged', update)
-      window.ethereum?.removeListener?.('chainChanged', update)
+    setSnapshot(session.getSnapshot())
+    return session.subscribe(() => setSnapshot(session.getSnapshot()))
+  }, [session])
+
+  useEffect(() => () => session.dispose(), [session])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    if (snapshot.status !== 'connected' || !snapshot.account) {
+      setOwnedFriends([])
+      return () => controller.abort()
     }
-  }, [sync])
+    setLoadingFriends(true); setDiscoveryError(null)
+    void readOwnedFriends(publicClient, snapshot.account, { signal: controller.signal })
+      .then(async ({ friends }) => Promise.all(friends.map(async (owned, index): Promise<FriendToken> => {
+        const art = await spriteReader.read(owned.id)
+        return {
+          collection: 'Rare Friends Generations', tokenId: owned.id.toString(), generation: owned.generation,
+          name: `${art.familyName} ${owned.id}`, color: accents[(Number(owned.id % BigInt(accents.length)))],
+          glyph: art.familyName.slice(0, 1), familyName: art.familyName, walletAddress: owned.walletAddress,
+          spriteRows: spriteFrame(art, 'down', false, index).frame.rows,
+        }
+      })))
+      .then(setOwnedFriends)
+      .catch((error: unknown) => { if (!controller.signal.aborted) setDiscoveryError(error instanceof Error ? error.message : 'Could not load your Friends.') })
+      .finally(() => { if (!controller.signal.aborted) setLoadingFriends(false) })
+    return () => controller.abort()
+  }, [publicClient, snapshot.account, snapshot.revision, snapshot.status, spriteReader])
 
   const connect = useCallback(async () => {
-    if (!window.ethereum) { setError('Install a browser wallet to connect.'); return }
-    setConnecting(true)
-    setError(null)
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
-      let currentChain = await window.ethereum.request({ method: 'eth_chainId' }) as string
-      if (currentChain !== ROBINHOOD_CHAIN_ID) {
-        try {
-          await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ROBINHOOD_CHAIN_ID }] })
-        } catch (switchError) {
-          if ((switchError as { code?: number }).code !== 4902) throw switchError
-          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [ROBINHOOD_CHAIN] })
-        }
-        currentChain = ROBINHOOD_CHAIN_ID
-      }
-      setAccount(accounts[0] ?? null)
-      setChainId(currentChain)
-    } catch {
-      setError('Wallet connection was cancelled or unavailable.')
-    } finally {
-      setConnecting(false)
-    }
-  }, [])
+    const result = await session.connect()
+    if (result.status === 'wrong-network') await session.switchNetwork()
+  }, [session])
 
-  return { account, chainId, error, connecting, isRobinhood: chainId === ROBINHOOD_CHAIN_ID, connect }
+  return { ...snapshot, error: snapshot.error ?? discoveryError, connecting: snapshot.status === 'connecting' || snapshot.status === 'switching-network', isRobinhood: snapshot.chainId === 4663, ownedFriends, loadingFriends, connect, switchNetwork: session.switchNetwork, disconnect: session.disconnect }
 }

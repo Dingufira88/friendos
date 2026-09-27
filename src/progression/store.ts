@@ -23,12 +23,14 @@ export interface FriendProgress {
   rfSpent: number
   rfBurned: number
   history: MissionRecord[]
+  installedSkills: string[]
 }
 
 interface ProgressionState {
   friends: Record<string, FriendProgress>
   completeMission: (friendId: string, request: string) => MissionRecord
   resetFriend: (friendId: string) => void
+  installSkill: (friendId: string, skillId: string, price: number) => boolean
 }
 
 export const initialProgress = (): FriendProgress => ({
@@ -39,6 +41,7 @@ export const initialProgress = (): FriendProgress => ({
   rfSpent: 0,
   rfBurned: 0,
   history: [],
+  installedSkills: ['deep-research'],
 })
 
 function createReceiptId(friendId: string, count: number) {
@@ -77,6 +80,7 @@ export const useProgressionStore = create<ProgressionState>()(
               rfSpent: current.rfSpent + record.rfSpent,
               rfBurned: current.rfBurned + record.rfBurned,
               history: [record, ...current.history],
+              installedSkills: current.installedSkills ?? ['deep-research'],
             },
           },
         }))
@@ -88,6 +92,12 @@ export const useProgressionStore = create<ProgressionState>()(
         delete friends[friendId]
         return { friends }
       }),
+      installSkill: (friendId, skillId, price) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        if (current.balance < price || current.installedSkills.includes(skillId)) return false
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, balance: current.balance - price, rfSpent: current.rfSpent + price, installedSkills: [...current.installedSkills, skillId] } } }))
+        return true
+      },
     }),
     { name: 'friendos-progression-v1' },
   ),
@@ -99,4 +109,8 @@ export function levelFromXp(xp: number) {
   const currentFloor = thresholds[level - 1] ?? 0
   const nextCeiling = thresholds[level] ?? currentFloor + 500
   return { level, currentFloor, nextCeiling, percent: Math.min(100, ((xp - currentFloor) / (nextCeiling - currentFloor)) * 100) }
+}
+
+export function evolutionFromLevel(level: number) {
+  return ['AWAKENED', 'CAPABLE', 'SPECIALIST', 'ADVANCED', 'LEGENDARY'][Math.min(4, level - 1)]
 }
