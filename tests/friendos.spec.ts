@@ -42,7 +42,7 @@ test('opens Skills marketplace and manages an operator wallet', async ({ page })
   await page.getByRole('button', { name: 'Save spending policy' }).click()
   await page.getByRole('button', { name: /Back to workspace/ }).click()
   await page.getByLabel('Tell your Friend what you need').fill('Research Rare Friends')
-  await expect(page.getByRole('button', { name: /Launch mission/ })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Launch mission/ })).toBeEnabled()
 })
 
 test('confirms which operator receives a skill and trains a skill NFT', async ({ page }) => {
@@ -69,4 +69,16 @@ test('runs distinct guest missions and opens acquired skill mastery', async ({ p
   await page.getByRole('button', { name: /View all 1 acquired skills/ }).click()
   await expect(page.getByRole('heading', { name: /Abilities that grow through work/ })).toBeVisible()
   await expect(page.locator('.mastery-list small').filter({ hasText: 'MASTERY XP' })).toBeVisible()
+})
+
+test('shows dynamic operator capabilities and keeps mission work docked', async ({ page }) => {
+  await page.getByRole('button', { name: /What can Signal do/ }).click()
+  await expect(page.getByRole('heading', { name: 'What can this operator do?' })).toBeVisible()
+  await expect(page.locator('.capability-list').getByText('Deep Research', { exact: true })).toBeVisible()
+  await page.locator('.capability-overlay > section > button').click()
+  await page.getByLabel('Tell your Friend what you need').fill('Assess wallet activity')
+  await page.getByRole('button', { name: /Launch mission/ }).click()
+  await expect(page.getByText('MISSION IN PROGRESS')).toBeVisible()
+  await expect(page.locator('.workspace')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Here’s what Signal found/ })).toBeVisible({ timeout: 15_000 })
 })

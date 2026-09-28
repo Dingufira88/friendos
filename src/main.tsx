@@ -4,6 +4,7 @@ import { App } from './app/App'
 import './styles.css'
 import './responsive-tabs.css'
 import './final-overrides.css'
+import './capabilities.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

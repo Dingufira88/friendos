@@ -21,6 +21,7 @@ export async function executeResearchMission(request: string, friend: FriendIden
         missionId,
         friend: { name: friend.name, archetype: friend.archetype, traits: friend.traits, primarySkill: friend.primarySkill },
       }),
+      signal: AbortSignal.timeout(6_000),
     })
     if (!response.ok) throw new Error(`Agent endpoint returned ${response.status}`)
     const payload = await response.json() as { report?: unknown; source?: unknown }
