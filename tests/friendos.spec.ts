@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('completes a Research Mission from the unified workspace', async ({ page }, testInfo) => {
-  await expect(page.getByRole('heading', { name: 'Meet your new operator.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your Rare Friend, your new operator.' })).toBeVisible()
   await page.getByLabel('Tell your Friend what you need').fill('Explain the strongest opportunities for Rare Friends builders.')
   await page.getByRole('button', { name: /Launch mission/ }).click()
   await expect(page.getByRole('heading', { name: 'Signal is on it.' })).toBeVisible()
