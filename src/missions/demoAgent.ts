@@ -5,6 +5,15 @@ export interface ResearchReport {
   nextActions: string[]
 }
 
+export type ReviewAction = 'clarify' | 'challenge' | 'refine'
+
+export function createReviewReport(action: ReviewAction, instruction: string, previous: ResearchReport): ResearchReport {
+  const direction = instruction.trim() || 'Make the result more useful and specific.'
+  if (action === 'clarify') return { summary: `Clarification requested: “${direction}” The recommendation rests on observable usefulness, explicit economic receipts, and repeat operator behavior—not novelty alone.`, findings: [`The original conclusion follows from this premise: ${previous.findings[0]}`, 'The strongest assumption is that users value an operator more when its output, cost, and progression remain attributable to one NFT.', 'Confidence should fall if repeated missions do not improve retention or if users ignore skill and receipt history.'], opportunities: ['Verify the key assumption with returning-user behavior.', 'Attach a primary source or product metric to every consequential claim.', 'Record which explanation resolved the reviewer’s uncertainty.'], nextActions: ['Confirm whether this explanation answers the review request.', 'Mark any remaining unsupported assumption.', 'Accept the current version or request a scoped revision.'] }
+  if (action === 'challenge') return { summary: `Challenge applied: “${direction}” The strongest counter-position is that operator identity and RF receipts add ceremony without enough utility; the proposal survives only where repeated work becomes measurably better or more accountable.`, findings: ['A generic AI tool may complete the same task with less friction.', 'Token spending is defensible only when the skill, history, or ownership context creates additional value.', `The original case remains strongest here: ${previous.opportunities[0]}`], opportunities: ['Measure whether users reopen the same operator for related work.', 'Compare mission completion against a generic assistant baseline.', 'Expose failure rate and revision count alongside successful receipts.'], nextActions: ['Define one falsifiable success metric.', 'Run the smallest comparison test.', 'Keep only the claims that remain supported after the challenge.'] }
+  return { summary: `Version revised from the instruction: “${direction}” The deliverable now leads with the practical outcome, makes its assumptions explicit, and ends with an executable next step.`, findings: previous.findings.map((finding, index) => index === 0 ? `${finding} This is now the primary evidence for the revised direction.` : finding), opportunities: previous.opportunities.map((opportunity, index) => index === 0 ? `${opportunity} Prioritize this before expanding scope.` : opportunity), nextActions: [`Apply the requested direction: ${direction}`, previous.nextActions[0], 'Review this version against the original brief and accept it only if the outcome is materially stronger.'] }
+}
+
 export function createDemoReport(topic: string, missionId = 'research'): ResearchReport {
   const subject = topic.trim() || 'Rare Friends ecosystem opportunities for developers'
 

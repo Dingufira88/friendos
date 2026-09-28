@@ -2,6 +2,19 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { missions } from '../missions/definitions'
 import { skillCatalog } from '../skills/catalog'
+import type { ResearchReport, ReviewAction } from '../missions/demoAgent'
+
+export interface MissionReview {
+  id: string
+  action: ReviewAction
+  instruction: string
+  result: ResearchReport
+  version: number
+  rfSpent: number
+  skillId: string
+  masteryEarned: number
+  completedAt: string
+}
 
 export interface MissionRecord {
   receiptId: string
@@ -19,11 +32,15 @@ export interface MissionRecord {
   skillDeveloper: string
   xpEarned: number
   credEarned: number
+  report?: ResearchReport
+  reviews?: MissionReview[]
+  acceptedVersion?: number
+  status?: 'in-review' | 'accepted'
 }
 
 export interface WalletTransaction {
   id: string
-  type: 'funding' | 'mission' | 'skill'
+  type: 'funding' | 'mission' | 'skill' | 'review'
   label: string
   amount: number
   createdAt: string
@@ -47,7 +64,8 @@ export interface FriendProgress {
 
 interface ProgressionState {
   friends: Record<string, FriendProgress>
-  completeMission: (friendId: string, request: string, missionId?: string) => MissionRecord
+  completeMission: (friendId: string, request: string, missionId?: string, report?: ResearchReport) => MissionRecord
+  completeReview: (friendId: string, receiptId: string, action: ReviewAction, instruction: string, result: ResearchReport) => MissionReview | null
   resetFriend: (friendId: string) => void
   installSkill: (friendId: string, skillId: string, price: number) => boolean
   fundWallet: (friendId: string, amount: number) => boolean
@@ -82,7 +100,7 @@ export const useProgressionStore = create<ProgressionState>()(
   persist(
     (set, get) => ({
       friends: {},
-      completeMission: (friendId, request, missionId = 'research') => {
+      completeMission: (friendId, request, missionId = 'research', report) => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         const mission = missions.find((item) => item.id === missionId) ?? missions[2]
         const skill = skillCatalog.find((item) => item.id === mission.skillId)
@@ -110,6 +128,9 @@ export const useProgressionStore = create<ProgressionState>()(
           skillDeveloper: developerAllocation ? skill?.developer ?? 'Community developer' : 'FriendOS ecosystem',
           xpEarned: mission.xpReward,
           credEarned: mission.credReward,
+          report,
+          reviews: [],
+          status: 'in-review',
         }
 
         set((state) => ({
@@ -134,6 +155,25 @@ export const useProgressionStore = create<ProgressionState>()(
         }))
 
         return record
+      },
+      completeReview: (friendId, receiptId, action, instruction, result) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        const mission = current.history.find((item) => item.receiptId === receiptId)
+        const reviews = mission?.reviews ?? []
+        if (!mission || reviews.length >= 3) return null
+        const rfSpent = action === 'clarify' ? 0 : action === 'challenge' ? 1 : 2
+        if (current.balance < rfSpent) return null
+        const review: MissionReview = { id: `${receiptId}-R${reviews.length + 1}`, action, instruction, result, version: reviews.length + 2, rfSpent, skillId: mission.skillId, masteryEarned: action === 'clarify' ? 5 : 10, completedAt: new Date().toISOString() }
+        const updatedMission: MissionRecord = { ...mission, reviews: [...reviews, review], status: 'in-review' }
+        set((state) => ({ friends: { ...state.friends, [friendId]: {
+          ...current,
+          balance: current.balance - rfSpent,
+          rfSpent: current.rfSpent + rfSpent,
+          skillMastery: { ...current.skillMastery, [mission.skillId]: (current.skillMastery[mission.skillId] ?? 0) + review.masteryEarned },
+          history: current.history.map((item) => item.receiptId === receiptId ? updatedMission : item),
+          transactions: rfSpent ? [{ id: review.id, type: 'review', label: `${mission.missionName} · ${action}`, amount: -rfSpent, createdAt: review.completedAt }, ...current.transactions] : current.transactions,
+        } } }))
+        return review
       },
       resetFriend: (friendId) => set((state) => {
         const friends = { ...state.friends }

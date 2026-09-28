@@ -5,6 +5,7 @@ import './styles.css'
 import './responsive-tabs.css'
 import './final-overrides.css'
 import './capabilities.css'
+import './reviews.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

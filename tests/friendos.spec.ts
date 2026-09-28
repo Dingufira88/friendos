@@ -82,3 +82,18 @@ test('shows dynamic operator capabilities and keeps mission work docked', async 
   await expect(page.locator('.workspace')).toBeVisible()
   await expect(page.getByRole('heading', { name: /Here’s what Signal found/ })).toBeVisible({ timeout: 15_000 })
 })
+
+test('refines a mission through a structured versioned review', async ({ page }) => {
+  await page.getByRole('button', { name: /Social Content/ }).click()
+  await page.getByLabel('Tell your Friend what you need').fill('Write a launch announcement for FriendOS')
+  await page.getByRole('button', { name: /Launch mission/ }).click()
+  await expect(page.getByText('MISSION REVIEW · 0/3 ROUNDS')).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('button', { name: 'Refine', exact: true }).click()
+  await page.getByLabel('Follow-up instruction').fill('Rewrite this for NFT collectors and lead with operator ownership')
+  await page.getByRole('button', { name: /SEND BACK TO SIGNAL/ }).click()
+  await expect(page.getByRole('button', { name: 'V2 · REFINE' })).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText(/Version revised from the instruction/)).toBeVisible()
+  await page.getByRole('button', { name: /Return to workspace/ }).click()
+  await expect(page.locator('.history-list article').filter({ hasText: '1 REVIEWS' })).toBeVisible()
+  await expect(page.locator('.history-list article').filter({ hasText: 'V2' })).toBeVisible()
+})

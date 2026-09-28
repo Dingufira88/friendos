@@ -1,0 +1,22 @@
+.mission-review{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+.mission-review>header{display:flex;justify-content:space-between;gap:24px;align-items:flex-end}
+.mission-review header small{color:var(--green);font:600 .62rem 'DM Mono'}
+.mission-review header h3{margin:8px 0 0;font-size:1.25rem}
+.version-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.version-tabs button{padding:7px 9px;border:1px solid var(--line);color:#a8adb5;background:#0d0f12;font:500 .56rem 'DM Mono';cursor:pointer}
+.version-tabs button:hover{border-color:var(--green);color:var(--green)}
+.review-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0}
+.review-actions button{position:relative;min-height:105px;padding:14px;border:1px solid var(--line);color:#fff;background:#0d0f12;text-align:left;cursor:pointer}
+.review-actions button.active{border-color:var(--green);background:#111b0d}
+.review-actions strong,.review-actions span{display:block}
+.review-actions span{margin-top:7px;padding-right:32px;color:#818793;font-size:.7rem;line-height:1.4}
+.review-actions b{position:absolute;right:10px;top:12px;color:var(--green);font:600 .58rem 'DM Mono'}
+.mission-review>label{display:block;color:#7a818b;font:600 .6rem 'DM Mono'}
+.mission-review textarea{display:block;width:100%;min-height:90px;margin-top:9px;padding:14px;resize:vertical;border:1px solid var(--line);outline:0;color:#fff;background:#0d0f12;font:400 .82rem Inter,Arial,sans-serif}
+.mission-review textarea:focus{border-color:var(--green)}
+.mission-review>footer{display:flex;padding:14px 0 0;border:0;justify-content:space-between}
+.mission-review>footer span{color:#777e88;font:600 .58rem 'DM Mono'}
+.mission-review>footer button{padding:11px 14px;border:1px solid var(--green);color:#091006;background:var(--green);font:600 .62rem 'DM Mono';cursor:pointer}
+.mission-review>footer button:disabled{opacity:.35}
+.review-limit{margin-top:18px;padding:16px;border:1px solid var(--green);background:#10180d}.review-limit p{margin:5px 0 0;color:#92979f}
+@media(max-width:700px){.mission-review>header{align-items:flex-start;flex-direction:column}.version-tabs{justify-content:flex-start}.review-actions{grid-template-columns:1fr}.mission-review>footer{align-items:flex-start;gap:12px;flex-direction:column}.mission-review>footer button{width:100%}}
