@@ -13,6 +13,7 @@ async function preparePage(viewport) {
   await page.addInitScript(() => {
     localStorage.setItem('friendos-onboarded', 'yes')
     localStorage.removeItem('friendos-progression-v1')
+    sessionStorage.setItem('friendos-booted', 'yes')
   })
   await page.goto(baseUrl, { waitUntil: 'networkidle' })
   return page

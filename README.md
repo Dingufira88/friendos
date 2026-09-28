@@ -53,21 +53,24 @@ Connected-wallet `$RAREFRIENDS` holdings are real read-only chain data and are d
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    A[Guest or wallet owner] --> B[FriendOS React UI]
-    B --> C[FriendSDK wallet session]
-    C --> D[Robinhood Chain]
-    D --> E[Owned Generations NFTs]
-    D --> F[On-chain sprite and Friend wallet]
-    D --> G[Read-only RF balance]
-    B --> H[Zustand operator state]
-    H --> I[Missions and receipts]
-    H --> J[Skills and mastery]
-    H --> K[Simulated RF ledger]
-    B --> L[/api/mission]
-    L --> M[OpenAI Responses API]
-    L -. unavailable .-> N[Deterministic offline reports]
+```text
+Guest or wallet owner
+        |
+        v
+FriendOS React UI
+   |          |-----------------------> Mission API
+   |          |                             |-- OpenAI Responses API
+   |          |                             `-- Deterministic offline reports
+   |          |
+   |          `--> Operator state
+   |                 |-- Missions and receipts
+   |                 |-- Skills and mastery
+   |                 `-- Simulated RF ledger
+   |
+   `--> FriendSDK wallet session --> Robinhood Chain
+                                      |-- Owned Generations NFTs
+                                      |-- On-chain sprites + Friend wallets
+                                      `-- Read-only RF balance
 ```
 
 The GitHub Pages demo is static and uses deterministic offline reports. `api/mission.ts` is available for serverless deployments configured with `OPENAI_API_KEY`.
