@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { createFriendPublicClient, createFriendWalletSession, type FriendWalletSnapshot } from '@rarefriends/friendsdk/wallet'
 import { readOwnedFriends } from '@rarefriends/friendsdk/owned'
 import { createGenerationSpriteReader, spriteFrame } from '@rarefriends/friendsdk/sprites'
@@ -13,28 +13,22 @@ export function useWallet() {
   const session = useMemo(() => createFriendWalletSession(), [])
   const publicClient = useMemo(() => createFriendPublicClient({ batch: true }), [])
   const spriteReader = useMemo(() => createGenerationSpriteReader(publicClient), [publicClient])
-  const [snapshot, setSnapshot] = useState<FriendWalletSnapshot>(() => session.getSnapshot() ?? emptySnapshot)
+  const subscribe = useCallback((onStoreChange: () => void) => session.subscribe(onStoreChange), [session])
+  const getSnapshot = useCallback(() => session.getSnapshot() ?? emptySnapshot, [session])
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => emptySnapshot)
   const [ownedFriends, setOwnedFriends] = useState<FriendToken[]>([])
-  const [loadingFriends, setLoadingFriends] = useState(false)
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
-  const [signedIn, setSignedIn] = useState(false)
+  const [loadedAccount, setLoadedAccount] = useState<string | null>(null)
+  const [discoveryError, setDiscoveryError] = useState<{ account: string; message: string } | null>(null)
+  const [signedAccount, setSignedAccount] = useState<string | null>(null)
   const [rfBalance, setRfBalance] = useState('0')
-
-  useEffect(() => {
-    setSnapshot(session.getSnapshot())
-    return session.subscribe(() => setSnapshot(session.getSnapshot()))
-  }, [session])
 
   useEffect(() => () => session.dispose(), [session])
 
   useEffect(() => {
     const controller = new AbortController()
     if (snapshot.status !== 'connected' || !snapshot.account) {
-      setOwnedFriends([])
-      setSignedIn(false); setRfBalance('0')
       return () => controller.abort()
     }
-    setLoadingFriends(true); setDiscoveryError(null)
     void publicClient.readContract({ address: RF_TOKEN, abi: [{ type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }] }], functionName: 'balanceOf', args: [snapshot.account] }).then((value) => setRfBalance(Number(formatUnits(value, 18)).toLocaleString(undefined, { maximumFractionDigits: 2 }))).catch(() => setRfBalance('0'))
     void readOwnedFriends(publicClient, snapshot.account, { signal: controller.signal })
       .then(async ({ friends }) => Promise.all(friends.slice(0, 3).map(async (owned, index): Promise<FriendToken> => {
@@ -47,9 +41,8 @@ export function useWallet() {
           avatarIndex: index,
         }
       })))
-      .then(setOwnedFriends)
-      .catch((error: unknown) => { if (!controller.signal.aborted) setDiscoveryError(error instanceof Error ? error.message : 'Could not load your Friends.') })
-      .finally(() => { if (!controller.signal.aborted) setLoadingFriends(false) })
+      .then((friends) => { setOwnedFriends(friends); setLoadedAccount(snapshot.account); setDiscoveryError(null) })
+      .catch((error: unknown) => { if (!controller.signal.aborted) { setDiscoveryError({ account: snapshot.account!, message: error instanceof Error ? error.message : 'Could not load your Friends.' }); setLoadedAccount(snapshot.account) } })
     return () => controller.abort()
   }, [publicClient, snapshot.account, snapshot.revision, snapshot.status, spriteReader])
 
@@ -65,12 +58,15 @@ export function useWallet() {
     const message = `Sign in to FriendOS\n\nVerify ownership to load your Rare Friends and $RAREFRIENDS balance.\n\nAccount: ${current.account}\nNonce: ${Date.now()}`
     try {
       await provider.request({ method: 'personal_sign', params: [message, current.account] })
-      setSignedIn(true)
+      setSignedAccount(current.account)
       return true
-    } catch { setDiscoveryError('Signature request was declined.'); return false }
+    } catch { setDiscoveryError({ account: current.account, message: 'Signature request was declined.' }); return false }
   }, [session])
 
-  const disconnect = useCallback(() => { session.disconnect(); setSignedIn(false); setOwnedFriends([]) }, [session])
+  const disconnect = useCallback(() => { session.disconnect(); setSignedAccount(null) }, [session])
 
-  return { ...snapshot, error: snapshot.error ?? discoveryError, connecting: snapshot.status === 'connecting' || snapshot.status === 'switching-network', isRobinhood: snapshot.chainId === 4663, ownedFriends, loadingFriends, signedIn, rfBalance, connect, signIn, switchNetwork: session.switchNetwork, disconnect }
+  const connected = snapshot.status === 'connected' && Boolean(snapshot.account)
+  const loadingFriends = connected && loadedAccount !== snapshot.account
+  const activeDiscoveryError = discoveryError?.account === snapshot.account ? discoveryError.message : null
+  return { ...snapshot, error: snapshot.error ?? activeDiscoveryError, connecting: snapshot.status === 'connecting' || snapshot.status === 'switching-network', isRobinhood: snapshot.chainId === 4663, ownedFriends: connected && loadedAccount === snapshot.account ? ownedFriends : [], loadingFriends, signedIn: connected && signedAccount === snapshot.account, rfBalance: connected ? rfBalance : '0', connect, signIn, switchNetwork: session.switchNetwork, disconnect }
 }
