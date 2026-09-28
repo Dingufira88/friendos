@@ -5,15 +5,17 @@ import { createFriendIdentity } from '../friend/identity'
 import { executeResearchMission, type AgentSource } from '../agents/provider'
 import { createDemoReport, type ResearchReport } from '../missions/demoAgent'
 import { executionSteps, missions, researchMission } from '../missions/definitions'
-import { evolutionFromLevel, initialProgress, levelFromXp, useProgressionStore, type MissionRecord } from '../progression/store'
+import { evolutionFromLevel, initialProgress, levelFromXp, useProgressionStore, type FriendProgress, type MissionRecord } from '../progression/store'
 import { useWallet } from '../wallet/useWallet'
 import { skillCatalog } from '../skills/catalog'
 
 type Overlay = 'none' | 'working' | 'result'
+type View = 'workspace' | 'profile' | 'skills'
 
 export function App() {
   const demoIdentities = useMemo(() => demoFriends.map(createFriendIdentity), [])
   const [selectedId, setSelectedId] = useState(demoIdentities[0].tokenId)
+  const [view, setView] = useState<View>('workspace')
   const [showFriends, setShowFriends] = useState(false)
   const [selectedMission, setSelectedMission] = useState('research')
   const [request, setRequest] = useState('')
@@ -29,13 +31,16 @@ export function App() {
   const friendsProgress = useProgressionStore((state) => state.friends)
   const completeMission = useProgressionStore((state) => state.completeMission)
   const installSkill = useProgressionStore((state) => state.installSkill)
+  const fundWallet = useProgressionStore((state) => state.fundWallet)
+  const setWalletPolicy = useProgressionStore((state) => state.setWalletPolicy)
   const identities = useMemo(() => wallet.ownedFriends.length ? wallet.ownedFriends.map(createFriendIdentity) : demoIdentities, [demoIdentities, wallet.ownedFriends])
   const friend = identities.find((item) => item.tokenId === selectedId) ?? identities[0]
   const progress = { ...initialProgress(), ...friendsProgress[friend.tokenId] }
   const level = levelFromXp(progress.xp)
   const evolution = evolutionFromLevel(level.level)
   const activeMission = missions.find((mission) => mission.id === selectedMission) ?? researchMission
-  const canLaunch = activeMission.available && request.trim().length > 2 && progress.balance >= activeMission.rfCost
+  const spentToday = progress.transactions.filter((tx) => tx.amount < 0 && new Date(tx.createdAt).toDateString() === new Date().toDateString()).reduce((total, tx) => total - tx.amount, 0)
+  const canLaunch = activeMission.available && request.trim().length > 2 && progress.balance >= activeMission.rfCost && activeMission.rfCost <= progress.perMissionLimit && spentToday + activeMission.rfCost <= progress.dailyLimit
 
   useEffect(() => {
     if (!identities.some((item) => item.tokenId === selectedId)) setSelectedId(identities[0].tokenId)
@@ -64,18 +69,20 @@ export function App() {
     })
   }
 
-  return <div className="site" style={{ '--friend-accent': friend.color } as React.CSSProperties}>
+  return <div className={`site view-${view}`} style={{ '--friend-accent': friend.color } as React.CSSProperties}>
     <header className="topbar">
-      <button className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><Spark />friend<span>OS</span><i>BETA</i></button>
-      <nav><button className="active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Workspace</button><button onClick={() => activityRef.current?.scrollIntoView({ behavior: 'smooth' })}>Activity</button><button onClick={() => aboutRef.current?.scrollIntoView({ behavior: 'smooth' })}>About</button></nav>
+      <button className="brand" onClick={() => { setView('workspace'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}><Spark />friend<span>OS</span><i>BETA</i></button>
+      <nav><button className={view === 'workspace' ? 'active' : ''} onClick={() => { setView('workspace'); window.scrollTo({ top: 0 }) }}>Workspace</button><button className={view === 'profile' ? 'active' : ''} onClick={() => { setView('profile'); window.scrollTo({ top: 0 }) }}>Agent profile</button><button className={view === 'skills' ? 'active' : ''} onClick={() => { setView('skills'); window.scrollTo({ top: 0 }) }}>Skills</button><button onClick={() => { setView('workspace'); window.setTimeout(() => activityRef.current?.scrollIntoView({ behavior: 'smooth' })) }}>Activity</button></nav>
       <div className="top-actions"><span className="network"><b className={wallet.isRobinhood ? '' : 'off'} /> {wallet.isRobinhood ? 'Robinhood network' : 'Wallet offline'}</span><button className="signin" disabled={wallet.connecting} onClick={wallet.status === 'wrong-network' ? wallet.switchNetwork : wallet.connect}>{wallet.connecting ? 'Connecting…' : wallet.account ? `${wallet.account.slice(0, 6)}…${wallet.account.slice(-4)}` : 'Connect wallet ↗'}</button></div>
     </header>
     <main>
+      <AgentProfilePage friend={friend} progress={progress} level={level} evolution={evolution} identities={identities} selectedId={selectedId} onSelect={setSelectedId} onBack={() => setView('workspace')} onFund={(amount) => fundWallet(friend.tokenId, amount)} onPolicy={(daily, mission, auto) => setWalletPolicy(friend.tokenId, daily, mission, auto)} />
+      <section className="skill-revenue"><p className="kicker"><span /> SKILLS / OPEN MARKETPLACE <span /></p><div><h1>Teach your operator<br /><em>something new.</em></h1><p>Discover abilities made by the Rare Friends community, install them on a specific operator, or submit your own. Approved developers receive <strong>20% of every usage fee</strong> generated by their skill.</p></div><aside><span>CREATOR ECONOMY</span><strong>BUILD → APPROVE → EARN</strong><button onClick={() => (document.getElementById('skill-spec') as HTMLDialogElement)?.showModal()}>Contribute a skill ↗</button></aside></section>
       <section className="hero"><p className="kicker"><span /> YOUR FRIEND, AT WORK <span /></p><div className="hero-grid"><div><h1>Meet your new <em>operator.</em></h1><p>Give your Friend a mission. Watch them get to work. Every move has a story, and every RF has a purpose.</p></div><aside><strong>01 / THE WORKSPACE</strong><span>Your Friend can think, work, and spend.</span></aside></div></section>
       <div className="section-labels"><span><b>01</b> YOUR FRIEND</span><span><b>02</b> MISSION CONTROL</span></div>
       <section className="workspace">
         <div className="friend-column">
-          <article className={`friend-profile evolution-${level.level}`}><div className="profile-top"><span>GENERATIONS / #{friend.tokenId}</span><b><i /> {evolution}</b></div><div className="portrait"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><PixelFriend friend={friend} /><Spark /><Spark /><span className="evolution-mark">LV.{level.level}</span></div><div className="identity"><span>YOUR OPERATOR · {friend.familyName ?? `GEN ${friend.generation}`}</span><h2>{friend.name}<Spark /></h2><strong>The {friend.traits[0]} {friend.archetype}</strong><p>{friend.traits.join(', ')}, and delightfully thorough</p><i>#{friend.tokenId}</i></div><div className="evolution-track"><span style={{ width: `${Math.max(3, level.percent)}%` }} /><small>{level.nextCeiling - progress.xp} XP TO NEXT EVOLUTION</small></div><div className="profile-stats"><Stat label="MISSIONS" value={String(progress.missionCount)} /><Stat label="REPUTATION" value={`${progress.xp} XP`} /><Stat label="SKILLS" value={String(progress.installedSkills.length)} /></div></article>
+          <article className={`friend-profile evolution-${level.level}`}><div className="profile-top"><span>GENERATIONS / #{friend.tokenId}</span><b><i /> {evolution}</b></div><div className="portrait"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><PixelFriend friend={friend} /><Spark /><Spark /><span className="evolution-mark">LV.{level.level}</span></div><div className="identity"><span>YOUR OPERATOR · {friend.familyName ?? `GEN ${friend.generation}`}</span><h2>{friend.name}<Spark /></h2><strong>The {friend.traits[0]} {friend.archetype}</strong><p>{friend.traits.join(', ')}, and delightfully thorough</p><i>#{friend.tokenId}</i></div><div className="evolution-track"><span style={{ width: `${Math.max(3, level.percent)}%` }} /><small>{level.nextCeiling - progress.xp} XP TO NEXT EVOLUTION</small></div><div className="profile-stats"><Stat label="MISSIONS" value={String(progress.missionCount)} /><Stat label="REPUTATION" value={`${progress.xp} XP`} /><Stat label="SKILLS" value={String(progress.installedSkills.length)} /></div><button className="open-profile" onClick={() => { setView('profile'); window.scrollTo({ top: 0 }) }}>Open complete profile ↗</button></article>
           <button className="switcher" onClick={() => setShowFriends((value) => !value)}>◇ &nbsp; Switch Friend <span>{showFriends ? '×' : '⌄'}</span></button>
           <AnimatePresence>{showFriends && <motion.div className="friend-options" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>{identities.map((item) => <button key={item.tokenId} onClick={() => { setSelectedId(item.tokenId); setShowFriends(false) }}><b style={{ background: item.color }}><PixelFriend friend={item} compact /></b><span>{item.name}<small>Gen {item.generation} · {item.archetype} · #{item.tokenId}</small></span></button>)}</motion.div>}</AnimatePresence>
           {wallet.error && <p className="wallet-note">{wallet.error}</p>}{wallet.loadingFriends && <p className="wallet-note">READING YOUR FRIENDS ONCHAIN…</p>}
@@ -91,6 +98,17 @@ export function App() {
     <MissionOverlay overlay={overlay} friendName={friend.name} friendGlyph={friend.glyph} step={step} report={report} receipt={receipt} agentSource={agentSource} onClose={() => setOverlay('none')} />
     <dialog id="skill-spec" className="skill-dialog"><button onClick={() => (document.getElementById('skill-spec') as HTMLDialogElement)?.close()}>×</button><span>FRIENDOS SKILL STANDARD / V0.1</span><h2>Give every Friend a new ability.</h2><p>Register a unique skill ID, developer identity, capability description, install price, per-use RF cost, and a secure execution endpoint. Installed skill IDs are stored against each NFT operator profile.</p><code>{`{ id, name, developer, category, installPrice, usageCost, endpoint }`}</code></dialog>
   </div>
+}
+
+function AgentProfilePage({ friend, progress, level, evolution, identities, selectedId, onSelect, onBack, onFund, onPolicy }: { friend: ReturnType<typeof createFriendIdentity>; progress: FriendProgress; level: ReturnType<typeof levelFromXp>; evolution: string; identities: ReturnType<typeof createFriendIdentity>[]; selectedId: string; onSelect: (id: string) => void; onBack: () => void; onFund: (amount: number) => boolean; onPolicy: (daily: number, mission: number, auto: boolean) => void }) {
+  const [fundAmount, setFundAmount] = useState(25)
+  const [dailyLimit, setDailyLimit] = useState(progress.dailyLimit)
+  const [missionLimit, setMissionLimit] = useState(progress.perMissionLimit)
+  const [autoApprove, setAutoApprove] = useState(progress.autoApprove)
+  useEffect(() => { setDailyLimit(progress.dailyLimit); setMissionLimit(progress.perMissionLimit); setAutoApprove(progress.autoApprove) }, [progress.autoApprove, progress.dailyLimit, progress.perMissionLimit, selectedId])
+  const address = friend.walletAddress ?? `0xFriend${friend.tokenId.padStart(8, '0')}…${friend.tokenId.slice(-4)}`
+  const installed = skillCatalog.filter((skill) => progress.installedSkills.includes(skill.id))
+  return <section className="agent-page"><button className="back-link" onClick={onBack}>← Back to workspace</button><div className="profile-hero"><div className={`profile-avatar evolution-${level.level}`}><PixelFriend friend={friend} /><span>LV.{level.level}</span></div><div><small>GENERATIONS #{friend.tokenId} / {friend.familyName ?? `GEN ${friend.generation}`}</small><h1>{friend.name}<em>.</em></h1><p>The {friend.traits[0]} {friend.archetype} · {evolution}</p><div className="profile-pills"><span>{progress.missionCount} MISSIONS</span><span>{progress.xp} XP</span><span>{installed.length} SKILLS</span></div></div><label>SELECT OPERATOR<select value={selectedId} onChange={(event) => onSelect(event.target.value)}>{identities.map((item) => <option key={item.tokenId} value={item.tokenId}>{item.name} · #{item.tokenId}</option>)}</select></label></div><div className="profile-grid"><article className="wallet-panel"><header><div><small>FRIEND WALLET</small><h2>{progress.balance} <span>RF</span></h2></div><b>● ACTIVE</b></header><p className="wallet-address">{address}<button onClick={() => navigator.clipboard?.writeText(address)}>COPY</button></p><div className="fund-row"><label>FUND THIS WALLET<input aria-label="Funding amount" type="number" min="1" value={fundAmount} onChange={(event) => setFundAmount(Number(event.target.value))} /></label><button onClick={() => onFund(fundAmount)}>Add {fundAmount || 0} RF ↗</button></div><div className="policy"><h3>Spending controls</h3><label>DAILY LIMIT<input aria-label="Daily spending limit" type="number" min="0" value={dailyLimit} onChange={(event) => setDailyLimit(Number(event.target.value))} /><span>RF</span></label><label>PER-MISSION LIMIT<input aria-label="Per-mission spending limit" type="number" min="0" value={missionLimit} onChange={(event) => setMissionLimit(Number(event.target.value))} /><span>RF</span></label><label className="toggle"><input type="checkbox" checked={autoApprove} onChange={(event) => setAutoApprove(event.target.checked)} /><span /> Auto-approve within limits</label><button onClick={() => onPolicy(dailyLimit, missionLimit, autoApprove)}>Save spending policy</button></div></article><article className="profile-detail"><div className="detail-block"><small>INSTALLED SKILLS</small>{installed.map((skill) => <p key={skill.id}><i>{skill.icon}</i><span><strong>{skill.name}</strong>{skill.developer}</span><b>{skill.usageCost} RF / USE</b></p>)}</div><div className="detail-block transactions"><small>WALLET ACTIVITY</small>{progress.transactions.length ? progress.transactions.map((tx) => <p key={tx.id}><span><strong>{tx.label}</strong>{new Date(tx.createdAt).toLocaleString()}</span><b className={tx.amount > 0 ? 'credit' : ''}>{tx.amount > 0 ? '+' : ''}{tx.amount} RF</b></p>) : <p className="no-transactions">No transactions yet. Fund the wallet or launch a mission to begin.</p>}</div></article></div></section>
 }
 
 function Spark() { return <i className="spark" aria-hidden="true">✦</i> }

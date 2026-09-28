@@ -15,6 +15,14 @@ export interface MissionRecord {
   credEarned: number
 }
 
+export interface WalletTransaction {
+  id: string
+  type: 'funding' | 'mission' | 'skill'
+  label: string
+  amount: number
+  createdAt: string
+}
+
 export interface FriendProgress {
   balance: number
   xp: number
@@ -24,6 +32,10 @@ export interface FriendProgress {
   rfBurned: number
   history: MissionRecord[]
   installedSkills: string[]
+  dailyLimit: number
+  perMissionLimit: number
+  autoApprove: boolean
+  transactions: WalletTransaction[]
 }
 
 interface ProgressionState {
@@ -31,6 +43,8 @@ interface ProgressionState {
   completeMission: (friendId: string, request: string) => MissionRecord
   resetFriend: (friendId: string) => void
   installSkill: (friendId: string, skillId: string, price: number) => boolean
+  fundWallet: (friendId: string, amount: number) => boolean
+  setWalletPolicy: (friendId: string, dailyLimit: number, perMissionLimit: number, autoApprove: boolean) => void
 }
 
 export const initialProgress = (): FriendProgress => ({
@@ -42,6 +56,10 @@ export const initialProgress = (): FriendProgress => ({
   rfBurned: 0,
   history: [],
   installedSkills: ['deep-research'],
+  dailyLimit: 25,
+  perMissionLimit: 10,
+  autoApprove: true,
+  transactions: [],
 })
 
 function createReceiptId(friendId: string, count: number) {
@@ -81,6 +99,10 @@ export const useProgressionStore = create<ProgressionState>()(
               rfBurned: current.rfBurned + record.rfBurned,
               history: [record, ...current.history],
               installedSkills: current.installedSkills ?? ['deep-research'],
+              dailyLimit: current.dailyLimit ?? 25,
+              perMissionLimit: current.perMissionLimit ?? 10,
+              autoApprove: current.autoApprove ?? true,
+              transactions: [{ id: record.receiptId, type: 'mission', label: record.missionName, amount: -record.rfSpent, createdAt: record.completedAt }, ...(current.transactions ?? [])],
             },
           },
         }))
@@ -95,8 +117,18 @@ export const useProgressionStore = create<ProgressionState>()(
       installSkill: (friendId, skillId, price) => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         if (current.balance < price || current.installedSkills.includes(skillId)) return false
-        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, balance: current.balance - price, rfSpent: current.rfSpent + price, installedSkills: [...current.installedSkills, skillId] } } }))
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, balance: current.balance - price, rfSpent: current.rfSpent + price, installedSkills: [...current.installedSkills, skillId], transactions: [{ id: `SKILL-${skillId}-${Date.now()}`, type: 'skill', label: 'Skill installed', amount: -price, createdAt: new Date().toISOString() }, ...current.transactions] } } }))
         return true
+      },
+      fundWallet: (friendId, amount) => {
+        if (!Number.isFinite(amount) || amount <= 0) return false
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, balance: current.balance + amount, transactions: [{ id: `FUND-${Date.now()}`, type: 'funding', label: 'Wallet funded', amount, createdAt: new Date().toISOString() }, ...current.transactions] } } }))
+        return true
+      },
+      setWalletPolicy: (friendId, dailyLimit, perMissionLimit, autoApprove) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, dailyLimit: Math.max(0, dailyLimit), perMissionLimit: Math.max(0, perMissionLimit), autoApprove } } }))
       },
     }),
     { name: 'friendos-progression-v1' },
