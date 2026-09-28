@@ -46,7 +46,7 @@ Switching operators changes the complete working profile, not only the avatar.
 
 The demo models recurring RF demand through mission execution, skill installation, skill usage, operator funding, and future training and public task participation.
 
-Research-style missions demonstrate a proposed 50% burn allocation, with the remainder representing compute/service and ecosystem allocation. Marketplace skills add a proposed developer revenue share.
+Mission receipts demonstrate a proposed 50% burn, 30% compute/service, and 20% ecosystem allocation. When an installed community skill powers the matching mission, its creator receives that final 20% allocation instead.
 
 All economic actions are simulated and clearly separated from the connected wallet's live read-only RF holdings. No approval, transfer, burn, or other on-chain transaction occurs.
 
@@ -74,6 +74,18 @@ The remaining stack is React, TypeScript, Vite, Zustand, Framer Motion, Zod, an 
 - Canonical Generations identity data and sprites are read through FriendSDK.
 - The three guest operator portraits are original AI-generated presentation artwork created for FriendOS.
 - Silkscreen is used for display typography to align with the Rare Friends visual language.
+
+## Screenshots
+
+| Workspace | Mission receipt |
+|---|---|
+| ![FriendOS workspace](screenshots/01-workspace.png) | ![FriendOS mission receipt](screenshots/02-mission-receipt.png) |
+
+| Skill marketplace | Mobile workspace |
+|---|---|
+| ![FriendOS skill marketplace](screenshots/03-skill-marketplace.png) | ![FriendOS mobile workspace](screenshots/04-mobile-workspace.png) |
+
+See [JUDGE_GUIDE.md](JUDGE_GUIDE.md) for the recommended 90-second walkthrough and category proof.
 
 ## Known limitations and risks
 
