@@ -1,180 +1,1889 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { demoFriends } from '../friend/demoFriends'
-import { createFriendIdentity } from '../friend/identity'
-import { executeResearchMission, type AgentSource } from '../agents/provider'
-import { createDemoReport, createReviewReport, type ResearchReport, type ReviewAction } from '../missions/demoAgent'
-import { executionSteps, missions, researchMission } from '../missions/definitions'
-import { reviewCost, reviewSkillId } from '../missions/reviewRouting'
-import { evolutionFromLevel, initialProgress, levelFromXp, useProgressionStore, type FriendProgress, type MissionRecord } from '../progression/store'
-import { useWallet } from '../wallet/useWallet'
-import { skillCatalog } from '../skills/catalog'
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { demoFriends } from "../friend/demoFriends";
+import { createFriendIdentity } from "../friend/identity";
+import {
+  executeMissionReview,
+  executeResearchMission,
+  type AgentSource,
+} from "../agents/provider";
+import {
+  createDemoReport,
+  type ResearchReport,
+  type ReviewAction,
+} from "../missions/demoAgent";
+import {
+  executionSteps,
+  missions,
+  researchMission,
+} from "../missions/definitions";
+import { reviewCost, reviewSkillId } from "../missions/reviewRouting";
+import {
+  evolutionFromLevel,
+  initialProgress,
+  levelFromXp,
+  useProgressionStore,
+  type FriendProgress,
+  type MemoryType,
+  type MissionRecord,
+} from "../progression/store";
+import { useWallet } from "../wallet/useWallet";
+import { skillCatalog } from "../skills/catalog";
 
-type Overlay = 'none' | 'working' | 'result'
-type View = 'workspace' | 'profile' | 'skills'
+type Overlay = "none" | "working" | "result";
+type View = "workspace" | "profile" | "skills";
 
 export function App() {
-  const demoIdentities = useMemo(() => demoFriends.map(createFriendIdentity), [])
-  const [selectedId, setSelectedId] = useState(demoIdentities[0].tokenId)
-  const [view, setView] = useState<View>('workspace')
-  const [pendingSkill, setPendingSkill] = useState<(typeof skillCatalog)[number] | null>(null)
-  const [purchaseAgentId, setPurchaseAgentId] = useState(demoIdentities[0].tokenId)
-  const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('friendos-onboarded') !== 'yes')
-  const [showAgentSkills, setShowAgentSkills] = useState(false)
-  const [showCapabilities, setShowCapabilities] = useState(false)
-  const [showFriends, setShowFriends] = useState(false)
-  const [booting, setBooting] = useState(() => sessionStorage.getItem('friendos-booted') !== 'yes')
-  const [selectedMission, setSelectedMission] = useState('research')
-  const [request, setRequest] = useState('')
-  const [overlay, setOverlay] = useState<Overlay>('none')
-  const [step, setStep] = useState(0)
-  const [agentReady, setAgentReady] = useState(false)
-  const [agentSource, setAgentSource] = useState<AgentSource>('fallback')
-  const [report, setReport] = useState<ResearchReport>(() => createDemoReport('Rare Friends'))
-  const [receipt, setReceipt] = useState<MissionRecord | null>(null)
-  const [reviewing, setReviewing] = useState(false)
-  const activityRef = useRef<HTMLElement>(null)
-  const aboutRef = useRef<HTMLElement>(null)
-  const wallet = useWallet()
-  const friendsProgress = useProgressionStore((state) => state.friends)
-  const completeMission = useProgressionStore((state) => state.completeMission)
-  const completeReview = useProgressionStore((state) => state.completeReview)
-  const rawInstallSkill = useProgressionStore((state) => state.installSkill)
-  const fundWallet = useProgressionStore((state) => state.fundWallet)
-  const setWalletPolicy = useProgressionStore((state) => state.setWalletPolicy)
-  const identities = useMemo(() => wallet.ownedFriends.length ? wallet.ownedFriends.map(createFriendIdentity) : demoIdentities, [demoIdentities, wallet.ownedFriends])
-  const friend = identities.find((item) => item.tokenId === selectedId) ?? identities[0]
-  const progress = { ...initialProgress(), ...friendsProgress[friend.tokenId] }
-  const level = levelFromXp(progress.xp)
-  const evolution = evolutionFromLevel(level.level)
-  const activeMission = missions.find((mission) => mission.id === selectedMission) ?? researchMission
-  const spentToday = progress.transactions.filter((tx) => tx.amount < 0 && new Date(tx.createdAt).toDateString() === new Date().toDateString()).reduce((total, tx) => total - tx.amount, 0)
-  const guestMode = !wallet.account
-  const canAfford = guestMode || progress.balance >= activeMission.rfCost
-  const withinPolicy = guestMode || (activeMission.rfCost <= progress.perMissionLimit && spentToday + activeMission.rfCost <= progress.dailyLimit)
-  const canLaunch = activeMission.available && request.trim().length > 2 && canAfford && withinPolicy
-  const installSkill = (skillId: string) => { const skill = skillCatalog.find((item) => item.id === skillId); if (skill) { setPendingSkill(skill); setPurchaseAgentId(friend.tokenId) } }
+  const demoIdentities = useMemo(
+    () => demoFriends.map(createFriendIdentity),
+    [],
+  );
+  const [selectedId, setSelectedId] = useState(demoIdentities[0].tokenId);
+  const [view, setView] = useState<View>("workspace");
+  const [pendingSkill, setPendingSkill] = useState<
+    (typeof skillCatalog)[number] | null
+  >(null);
+  const [purchaseAgentId, setPurchaseAgentId] = useState(
+    demoIdentities[0].tokenId,
+  );
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => localStorage.getItem("friendos-onboarded") !== "yes",
+  );
+  const [showAgentSkills, setShowAgentSkills] = useState(false);
+  const [showCapabilities, setShowCapabilities] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
+  const [booting, setBooting] = useState(
+    () => sessionStorage.getItem("friendos-booted") !== "yes",
+  );
+  const [selectedMission, setSelectedMission] = useState("research");
+  const [request, setRequest] = useState("");
+  const [overlay, setOverlay] = useState<Overlay>("none");
+  const [step, setStep] = useState(0);
+  const [agentReady, setAgentReady] = useState(false);
+  const [agentSource, setAgentSource] = useState<AgentSource>("fallback");
+  const [report, setReport] = useState<ResearchReport>(() =>
+    createDemoReport("Rare Friends"),
+  );
+  const [receipt, setReceipt] = useState<MissionRecord | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [pendingParentReceiptId, setPendingParentReceiptId] =
+    useState<string>();
+  const activityRef = useRef<HTMLElement>(null);
+  const aboutRef = useRef<HTMLElement>(null);
+  const wallet = useWallet();
+  const friendsProgress = useProgressionStore((state) => state.friends);
+  const completeMission = useProgressionStore((state) => state.completeMission);
+  const completeReview = useProgressionStore((state) => state.completeReview);
+  const acceptMissionVersion = useProgressionStore(
+    (state) => state.acceptMissionVersion,
+  );
+  const rawInstallSkill = useProgressionStore((state) => state.installSkill);
+  const fundWallet = useProgressionStore((state) => state.fundWallet);
+  const setWalletPolicy = useProgressionStore((state) => state.setWalletPolicy);
+  const identities = useMemo(
+    () =>
+      wallet.ownedFriends.length
+        ? wallet.ownedFriends.map(createFriendIdentity)
+        : demoIdentities,
+    [demoIdentities, wallet.ownedFriends],
+  );
+  const friend =
+    identities.find((item) => item.tokenId === selectedId) ?? identities[0];
+  const progress = { ...initialProgress(), ...friendsProgress[friend.tokenId] };
+  const level = levelFromXp(progress.xp);
+  const evolution = evolutionFromLevel(level.level);
+  const activeMission =
+    missions.find((mission) => mission.id === selectedMission) ??
+    researchMission;
+  const spentToday = progress.transactions
+    .filter(
+      (tx) =>
+        tx.amount < 0 &&
+        new Date(tx.createdAt).toDateString() === new Date().toDateString(),
+    )
+    .reduce((total, tx) => total - tx.amount, 0);
+  const guestMode = !wallet.account;
+  const canAfford = guestMode || progress.balance >= activeMission.rfCost;
+  const withinPolicy =
+    guestMode ||
+    (activeMission.rfCost <= progress.perMissionLimit &&
+      spentToday + activeMission.rfCost <= progress.dailyLimit);
+  const canLaunch =
+    activeMission.available &&
+    request.trim().length > 2 &&
+    canAfford &&
+    withinPolicy;
+  const installSkill = (skillId: string) => {
+    const skill = skillCatalog.find((item) => item.id === skillId);
+    if (skill) {
+      setPendingSkill(skill);
+      setPurchaseAgentId(friend.tokenId);
+    }
+  };
 
   useEffect(() => {
-    if (!booting) return
-    sessionStorage.setItem('friendos-booted', 'yes')
-    const timer = window.setTimeout(() => setBooting(false), 1200)
-    return () => window.clearTimeout(timer)
-  }, [booting])
+    if (!booting) return;
+    sessionStorage.setItem("friendos-booted", "yes");
+    const timer = window.setTimeout(() => setBooting(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [booting]);
 
   useEffect(() => {
-    if (overlay !== 'working') return
+    if (overlay !== "working") return;
     if (step >= executionSteps.length - 1 && agentReady) {
       const timer = window.setTimeout(() => {
-        setReceipt(completeMission(friend.tokenId, request, selectedMission, report))
-        setOverlay('result')
-      }, 700)
-      return () => window.clearTimeout(timer)
+        setReceipt(
+          completeMission(
+            friend.tokenId,
+            request,
+            selectedMission,
+            report,
+            pendingParentReceiptId,
+          ),
+        );
+        setPendingParentReceiptId(undefined);
+        setOverlay("result");
+      }, 700);
+      return () => window.clearTimeout(timer);
     }
     if (step < executionSteps.length - 1) {
-      const timer = window.setTimeout(() => setStep((current) => current + 1), 650)
-      return () => window.clearTimeout(timer)
+      const timer = window.setTimeout(
+        () => setStep((current) => current + 1),
+        650,
+      );
+      return () => window.clearTimeout(timer);
     }
-  }, [agentReady, completeMission, friend.tokenId, overlay, report, request, selectedMission, step])
+  }, [
+    agentReady,
+    completeMission,
+    friend.tokenId,
+    overlay,
+    pendingParentReceiptId,
+    report,
+    request,
+    selectedMission,
+    step,
+  ]);
 
   function launchMission() {
-    if (!canLaunch) return
-    setStep(0); setAgentReady(false); setReceipt(null); setOverlay('working')
-    void executeResearchMission(request, friend, selectedMission, { installedSkills: progress.installedSkills, skillMastery: progress.skillMastery }).then((result) => {
-      setReport(result.report); setAgentSource(result.source); setAgentReady(true)
-    })
+    if (!canLaunch) return;
+    setStep(0);
+    setAgentReady(false);
+    setReceipt(null);
+    setOverlay("working");
+    void executeResearchMission(request, friend, selectedMission, {
+      installedSkills: progress.installedSkills,
+      skillMastery: progress.skillMastery,
+    }).then((result) => {
+      setReport(result.report);
+      setAgentSource(result.source);
+      setAgentReady(true);
+    });
   }
 
-  function runMissionReview(action: ReviewAction, instruction: string, usedNativeFallback: boolean) {
-    if (!receipt || reviewing || (receipt.reviews?.length ?? 0) >= 3) return
-    setReviewing(true)
-    const reviewedReport = createReviewReport(action, instruction, report)
+  async function runMissionReview(
+    action: ReviewAction,
+    instruction: string,
+    usedNativeFallback: boolean,
+  ) {
+    if (!receipt || reviewing || (receipt.reviews?.length ?? 0) >= 3) return;
+    setReviewing(true);
+    const { report: reviewedReport, source } = await executeMissionReview(
+      action,
+      instruction,
+      report,
+    );
     window.setTimeout(() => {
-      const review = completeReview(friend.tokenId, receipt.receiptId, action, instruction, reviewedReport, usedNativeFallback)
+      const review = completeReview(
+        friend.tokenId,
+        receipt.receiptId,
+        action,
+        instruction,
+        reviewedReport,
+        usedNativeFallback,
+      );
       if (review) {
-        setReceipt((current) => current ? { ...current, reviews: [...(current.reviews ?? []), review], status: 'in-review' } : current)
-        setReport(reviewedReport)
+        setReceipt((current) =>
+          current
+            ? {
+                ...current,
+                reviews: [...(current.reviews ?? []), review],
+                status: "in-review",
+              }
+            : current,
+        );
+        setReport(reviewedReport);
+        setAgentSource(source);
       }
-      setReviewing(false)
-    }, 1100)
+      setReviewing(false);
+    }, 1100);
   }
 
-  return <div className={`site view-${view}`} style={{ '--friend-accent': friend.color } as React.CSSProperties}>
-    <AnimatePresence>{booting && <BootScreen friend={demoIdentities[0]} />}</AnimatePresence>
-    <header className="topbar">
-      <button className="brand" onClick={() => { setView('workspace'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}><Spark />friend<span>OS</span><i>BETA</i></button>
-      <nav><button className={view === 'workspace' ? 'active' : ''} onClick={() => { setView('workspace'); window.scrollTo({ top: 0 }) }}>Workspace</button><button className={view === 'profile' ? 'active' : ''} onClick={() => { setView('profile'); window.scrollTo({ top: 0 }) }}>Agent profile</button><button className={view === 'skills' ? 'active' : ''} onClick={() => { setView('skills'); window.scrollTo({ top: 0 }) }}>Skills</button><button onClick={() => { setView('workspace'); window.setTimeout(() => activityRef.current?.scrollIntoView({ behavior: 'smooth' })) }}>Activity</button></nav>
-      <div className="top-actions"><span className="network"><b className={wallet.isRobinhood ? '' : 'off'} /> {wallet.isRobinhood ? 'Robinhood network' : 'Wallet offline'}</span><button className="signin" disabled={wallet.connecting} onClick={wallet.status === 'wrong-network' ? wallet.switchNetwork : wallet.connect}>{wallet.connecting ? 'Connecting…' : wallet.account ? `${wallet.account.slice(0, 6)}…${wallet.account.slice(-4)}` : 'Connect wallet ↗'}</button></div>
-    </header>
-    <main>
-      <WalletSessionCard wallet={wallet} onGuide={() => setShowOnboarding(true)} />
-      <button className="agent-skills-open" onClick={() => setShowAgentSkills(true)}>View all {progress.installedSkills.length} acquired skills ↗</button>
-      <AgentProfilePage key={friend.tokenId} friend={friend} progress={progress} level={level} evolution={evolution} identities={identities} selectedId={friend.tokenId} onSelect={setSelectedId} onBack={() => setView('workspace')} onFund={(amount) => fundWallet(friend.tokenId, amount)} onPolicy={(daily, mission, auto) => setWalletPolicy(friend.tokenId, daily, mission, auto)} />
-      <section className="skill-revenue"><p className="kicker"><span /> SKILLS / OPEN MARKETPLACE <span /></p><div><h1>Teach your operator<br /><em>something new.</em></h1><p>Discover abilities made by the Rare Friends community, install them on a specific operator, or submit your own. Approved developers receive <strong>20% of every usage fee</strong> generated by their skill.</p></div><aside><span>CREATOR ECONOMY</span><strong>BUILD → APPROVE → EARN</strong><button onClick={() => (document.getElementById('skill-spec') as HTMLDialogElement)?.showModal()}>Contribute a skill ↗</button></aside></section>
-      <TrainingLab />
-      <section className="hero"><p className="kicker"><span /> YOUR FRIEND, AT WORK <span /></p><div className="hero-grid"><div><h1>Your Rare Friend,<br /><em>your new operator.</em></h1><p>Give your Friend a mission. Watch them get to work. Every move has a story, and every RF has a purpose.</p></div><aside><strong>01 / THE WORKSPACE</strong><span>Your Friend can think, work, and spend.</span></aside></div></section>
-      <div className="section-labels"><span><b>01</b> YOUR FRIEND</span><span><b>02</b> MISSION CONTROL</span></div>
-      <section className="workspace">
-        <div className="friend-column">
-          <article className={`friend-profile evolution-${level.level}`}><div className="profile-top"><span>GENERATIONS / #{friend.tokenId}</span><b><i /> {evolution}</b></div><div className="portrait"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><PixelFriend friend={friend} /><Spark /><Spark /><span className="evolution-mark">LV.{level.level}</span></div><div className="identity"><span>YOUR OPERATOR · {friend.familyName ?? `GEN ${friend.generation}`}</span><h2>{friend.name}<Spark /></h2><strong>The {friend.traits[0]} {friend.archetype}</strong><p>{friend.traits.join(', ')}, and delightfully thorough</p><i>#{friend.tokenId}</i></div><div className="evolution-track"><span style={{ width: `${Math.max(3, level.percent)}%` }} /><small>{level.nextCeiling - progress.xp} XP TO NEXT EVOLUTION</small></div><div className="profile-stats"><Stat label="MISSIONS" value={String(progress.missionCount)} /><Stat label="REPUTATION" value={`${progress.xp} XP`} /><Stat label="SKILLS" value={String(progress.installedSkills.length)} /></div><button className="open-profile" onClick={() => { setView('profile'); window.scrollTo({ top: 0 }) }}>Open complete profile ↗</button></article>
-          <button className="operator-capabilities-open" onClick={() => setShowCapabilities(true)}>✦ What can {friend.name} do?</button>
-          <button className="switcher" onClick={() => setShowFriends((value) => !value)}>◇ &nbsp; Switch Friend <span>{showFriends ? '×' : '⌄'}</span></button>
-          <AnimatePresence>{showFriends && <motion.div className="friend-options" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>{identities.map((item) => <button key={item.tokenId} onClick={() => { setSelectedId(item.tokenId); setShowFriends(false) }}><b style={{ background: item.color }}><PixelFriend friend={item} compact /></b><span>{item.name}<small>Gen {item.generation} · {item.archetype} · #{item.tokenId}</small></span></button>)}</motion.div>}</AnimatePresence>
-          {wallet.error && <p className="wallet-note">{wallet.error}</p>}{wallet.loadingFriends && <p className="wallet-note">READING YOUR FRIENDS ONCHAIN…</p>}
+  function continueMission(parent: MissionRecord) {
+    setPendingParentReceiptId(parent.receiptId);
+    setRequest(`Continue from ${parent.receiptId}: `);
+    setSelectedMission(parent.missionId);
+    setOverlay("none");
+    window.setTimeout(
+      () =>
+        document
+          .querySelector(".mission-control")
+          ?.scrollIntoView({ behavior: "smooth" }),
+      50,
+    );
+  }
+
+  return (
+    <div
+      className={`site view-${view}`}
+      style={{ "--friend-accent": friend.color } as React.CSSProperties}
+    >
+      <AnimatePresence>
+        {booting && <BootScreen friend={demoIdentities[0]} />}
+      </AnimatePresence>
+      <header className="topbar">
+        <button
+          className="brand"
+          onClick={() => {
+            setView("workspace");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        >
+          <Spark />
+          friend<span>OS</span>
+          <i>BETA</i>
+        </button>
+        <nav>
+          <button
+            className={view === "workspace" ? "active" : ""}
+            onClick={() => {
+              setView("workspace");
+              window.scrollTo({ top: 0 });
+            }}
+          >
+            Workspace
+          </button>
+          <button
+            className={view === "profile" ? "active" : ""}
+            onClick={() => {
+              setView("profile");
+              window.scrollTo({ top: 0 });
+            }}
+          >
+            Agent profile
+          </button>
+          <button
+            className={view === "skills" ? "active" : ""}
+            onClick={() => {
+              setView("skills");
+              window.scrollTo({ top: 0 });
+            }}
+          >
+            Skills
+          </button>
+          <button
+            onClick={() => {
+              setView("workspace");
+              window.setTimeout(() =>
+                activityRef.current?.scrollIntoView({ behavior: "smooth" }),
+              );
+            }}
+          >
+            Activity
+          </button>
+        </nav>
+        <div className="top-actions">
+          <span className="network">
+            <b className={wallet.isRobinhood ? "" : "off"} />{" "}
+            {wallet.isRobinhood ? "Robinhood network" : "Wallet offline"}
+          </span>
+          <button
+            className="signin"
+            disabled={wallet.connecting}
+            onClick={
+              wallet.status === "wrong-network"
+                ? wallet.switchNetwork
+                : wallet.connect
+            }
+          >
+            {wallet.connecting
+              ? "Connecting…"
+              : wallet.account
+                ? `${wallet.account.slice(0, 6)}…${wallet.account.slice(-4)}`
+                : "Connect wallet ↗"}
+          </button>
         </div>
-        <article className="mission-control"><p className="micro">WHAT WILL {friend.name.toUpperCase()} DO TODAY?</p><h2>Put your Friend to work<em>.</em></h2><Spark /><div className="mission-choices">{missions.slice(0, 4).map((mission) => <button key={mission.id} className={selectedMission === mission.id ? 'selected' : ''} disabled={!mission.available} onClick={() => setSelectedMission(mission.id)}><i>{mission.id === 'research' ? '⌕' : '✦'}</i><span><strong>{mission.name}</strong><small>{mission.description}</small></span><b>{mission.rfCost} RF</b></button>)}</div><div className="brief-title"><strong>THE BRIEF</strong><span>{request.length} / 500</span></div><textarea aria-label="Tell your Friend what you need" maxLength={500} value={request} onChange={(event) => setRequest(event.target.value)} placeholder={`What would you like ${friend.name} to research?`} /><p className="hint">✳ Be specific. Your Friend does the rest.</p><div className="suggestions"><span>NEED A START?</span>{['Research the future of onchain games', 'Write a launch announcement', 'Plan my next creative project'].map((idea) => <button key={idea} onClick={() => setRequest(idea)}>{idea} ↗</button>)}</div><div className="launch-row"><div><span>MISSION COST<strong>{activeMission.rfCost} RF</strong></span><b>→</b><span>AFTER MISSION<strong>{progress.balance - activeMission.rfCost} RF</strong></span></div><button disabled={!canLaunch} onClick={launchMission}>Launch mission ↗</button></div></article>
+      </header>
+      <main>
+        <WalletSessionCard
+          wallet={wallet}
+          onGuide={() => setShowOnboarding(true)}
+        />
+        <button
+          className="agent-skills-open"
+          onClick={() => setShowAgentSkills(true)}
+        >
+          View all {progress.installedSkills.length} acquired skills ↗
+        </button>
+        <AgentProfilePage
+          key={friend.tokenId}
+          friend={friend}
+          progress={progress}
+          level={level}
+          evolution={evolution}
+          identities={identities}
+          selectedId={friend.tokenId}
+          onSelect={setSelectedId}
+          onBack={() => setView("workspace")}
+          onFund={(amount) => fundWallet(friend.tokenId, amount)}
+          onPolicy={(daily, mission, auto) =>
+            setWalletPolicy(friend.tokenId, daily, mission, auto)
+          }
+        />
+        <section className="skill-revenue">
+          <p className="kicker">
+            <span /> SKILLS / OPEN MARKETPLACE <span />
+          </p>
+          <div>
+            <h1>
+              Teach your operator
+              <br />
+              <em>something new.</em>
+            </h1>
+            <p>
+              Discover abilities made by the Rare Friends community, install
+              them on a specific operator, or submit your own. Approved
+              developers receive <strong>20% of every usage fee</strong>{" "}
+              generated by their skill.
+            </p>
+          </div>
+          <aside>
+            <span>CREATOR ECONOMY</span>
+            <strong>BUILD → APPROVE → EARN</strong>
+            <button
+              onClick={() =>
+                (
+                  document.getElementById("skill-spec") as HTMLDialogElement
+                )?.showModal()
+              }
+            >
+              Contribute a skill ↗
+            </button>
+          </aside>
+        </section>
+        <TrainingLab />
+        <section className="hero">
+          <p className="kicker">
+            <span /> YOUR FRIEND, AT WORK <span />
+          </p>
+          <div className="hero-grid">
+            <div>
+              <h1>
+                Your Rare Friend,
+                <br />
+                <em>your new operator.</em>
+              </h1>
+              <p>
+                Give your Friend a mission. Watch them get to work. Every move
+                has a story, and every RF has a purpose.
+              </p>
+            </div>
+            <aside>
+              <strong>01 / THE WORKSPACE</strong>
+              <span>Your Friend can think, work, and spend.</span>
+            </aside>
+          </div>
+        </section>
+        <div className="section-labels">
+          <span>
+            <b>01</b> YOUR FRIEND
+          </span>
+          <span>
+            <b>02</b> MISSION CONTROL
+          </span>
+        </div>
+        <section className="workspace">
+          <div className="friend-column">
+            <article className={`friend-profile evolution-${level.level}`}>
+              <div className="profile-top">
+                <span>GENERATIONS / #{friend.tokenId}</span>
+                <b>
+                  <i /> {evolution}
+                </b>
+              </div>
+              <div className="portrait">
+                <div className="orbit orbit-one" />
+                <div className="orbit orbit-two" />
+                <PixelFriend friend={friend} />
+                <Spark />
+                <Spark />
+                <span className="evolution-mark">LV.{level.level}</span>
+              </div>
+              <div className="identity">
+                <span>
+                  YOUR OPERATOR ·{" "}
+                  {friend.familyName ?? `GEN ${friend.generation}`}
+                </span>
+                <h2>
+                  {friend.name}
+                  <Spark />
+                </h2>
+                <strong>
+                  The {friend.traits[0]} {friend.archetype}
+                </strong>
+                <p>{friend.traits.join(", ")}, and delightfully thorough</p>
+                <i>#{friend.tokenId}</i>
+              </div>
+              <div className="evolution-track">
+                <span style={{ width: `${Math.max(3, level.percent)}%` }} />
+                <small>
+                  {level.nextCeiling - progress.xp} XP TO NEXT EVOLUTION
+                </small>
+              </div>
+              <div className="profile-stats">
+                <Stat label="MISSIONS" value={String(progress.missionCount)} />
+                <Stat label="REPUTATION" value={`${progress.xp} XP`} />
+                <Stat
+                  label="SKILLS"
+                  value={String(progress.installedSkills.length)}
+                />
+              </div>
+              <button
+                className="open-profile"
+                onClick={() => {
+                  setView("profile");
+                  window.scrollTo({ top: 0 });
+                }}
+              >
+                Open complete profile ↗
+              </button>
+            </article>
+            <button
+              className="operator-capabilities-open"
+              onClick={() => setShowCapabilities(true)}
+            >
+              ✦ What can {friend.name} do?
+            </button>
+            <button
+              className="switcher"
+              onClick={() => setShowFriends((value) => !value)}
+            >
+              ◇ &nbsp; Switch Friend <span>{showFriends ? "×" : "⌄"}</span>
+            </button>
+            <AnimatePresence>
+              {showFriends && (
+                <motion.div
+                  className="friend-options"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  {identities.map((item) => (
+                    <button
+                      key={item.tokenId}
+                      onClick={() => {
+                        setSelectedId(item.tokenId);
+                        setShowFriends(false);
+                      }}
+                    >
+                      <b style={{ background: item.color }}>
+                        <PixelFriend friend={item} compact />
+                      </b>
+                      <span>
+                        {item.name}
+                        <small>
+                          Gen {item.generation} · {item.archetype} · #
+                          {item.tokenId}
+                        </small>
+                      </span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {wallet.error && <p className="wallet-note">{wallet.error}</p>}
+            {wallet.loadingFriends && (
+              <p className="wallet-note">READING YOUR FRIENDS ONCHAIN…</p>
+            )}
+          </div>
+          <article className="mission-control">
+            <p className="micro">
+              WHAT WILL {friend.name.toUpperCase()} DO TODAY?
+            </p>
+            <h2>
+              Put your Friend to work<em>.</em>
+            </h2>
+            <Spark />
+            <div className="mission-choices">
+              {missions.slice(0, 4).map((mission) => (
+                <button
+                  key={mission.id}
+                  className={selectedMission === mission.id ? "selected" : ""}
+                  disabled={!mission.available}
+                  onClick={() => setSelectedMission(mission.id)}
+                >
+                  <i>{mission.id === "research" ? "⌕" : "✦"}</i>
+                  <span>
+                    <strong>{mission.name}</strong>
+                    <small>{mission.description}</small>
+                  </span>
+                  <b>{mission.rfCost} RF</b>
+                </button>
+              ))}
+            </div>
+            <div className="brief-title">
+              <strong>THE BRIEF</strong>
+              <span>{request.length} / 500</span>
+            </div>
+            <textarea
+              aria-label="Tell your Friend what you need"
+              maxLength={500}
+              value={request}
+              onChange={(event) => setRequest(event.target.value)}
+              placeholder={`What would you like ${friend.name} to research?`}
+            />
+            <p className="hint">✳ Be specific. Your Friend does the rest.</p>
+            <div className="suggestions">
+              <span>NEED A START?</span>
+              {[
+                "Research the future of onchain games",
+                "Write a launch announcement",
+                "Plan my next creative project",
+              ].map((idea) => (
+                <button key={idea} onClick={() => setRequest(idea)}>
+                  {idea} ↗
+                </button>
+              ))}
+            </div>
+            <div className="launch-row">
+              <div>
+                <span>
+                  MISSION COST<strong>{activeMission.rfCost} RF</strong>
+                </span>
+                <b>→</b>
+                <span>
+                  AFTER MISSION
+                  <strong>{progress.balance - activeMission.rfCost} RF</strong>
+                </span>
+              </div>
+              <button disabled={!canLaunch} onClick={launchMission}>
+                Launch mission ↗
+              </button>
+            </div>
+          </article>
+        </section>
+        <p className="friend-promise">
+          ✦ Every mission is completed by your Friend, not a generic assistant.
+        </p>
+        <section className="skills-market">
+          <div className="section-rule">
+            <b>03</b> SKILL MARKETPLACE <span />
+          </div>
+          <div className="skills-heading">
+            <div>
+              <small>EXPAND WHAT YOUR FRIEND CAN DO</small>
+              <h2>
+                New abilities, built by anyone<em>.</em>
+              </h2>
+            </div>
+            <p>
+              Skills belong to this operator. Install a community-built ability
+              and it stays with their profile as they evolve.
+            </p>
+          </div>
+          <div className="skill-grid">
+            {skillCatalog.map((skill) => {
+              const installed = progress.installedSkills.includes(skill.id);
+              return (
+                <article key={skill.id}>
+                  <div>
+                    <i>{skill.icon}</i>
+                    <span>{skill.category}</span>
+                  </div>
+                  <h3>{skill.name}</h3>
+                  <p>{skill.description}</p>
+                  <small>{skill.developer}</small>
+                  <button
+                    disabled={installed || progress.balance < skill.price}
+                    onClick={() => installSkill(skill.id)}
+                  >
+                    {installed
+                      ? "INSTALLED ✓"
+                      : skill.price
+                        ? `INSTALL · ${skill.price} RF`
+                        : "INSTALL FREE"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+          <div className="developer-callout">
+            <span>BUILD FOR FRIENDOS</span>
+            <p>
+              External developers can publish skills with a name, capability,
+              price, and execution endpoint.
+            </p>
+            <button
+              onClick={() =>
+                (
+                  document.getElementById("skill-spec") as HTMLDialogElement
+                )?.showModal()
+              }
+            >
+              View developer spec ↗
+            </button>
+          </div>
+        </section>
+        <section className="economy" ref={activityRef}>
+          <div className="section-rule">
+            <b>03</b> THE ECONOMY OF DOING <span />
+          </div>
+          <div className="economy-heading">
+            <div>
+              <small>EVERY RF TELLS A STORY</small>
+              <h2>
+                Work, not just words<em>.</em>
+              </h2>
+            </div>
+            <p>
+              Real output. Visible cost. A growing record of what your Friend
+              has done.
+            </p>
+          </div>
+          <div className="economy-cards">
+            <EconomyCard
+              label="AVAILABLE BALANCE"
+              value={progress.balance}
+              note="Operating budget"
+              icon="◇"
+            />
+            <EconomyCard
+              label="LIFETIME RF SPENT"
+              value={progress.rfSpent}
+              note="Invested in useful work"
+              icon="✳"
+            />
+            <EconomyCard
+              label="LIFETIME RF BURNED"
+              value={progress.rfBurned}
+              note="Removed from circulation"
+              icon="♨"
+            />
+          </div>
+          <div className="history-head">
+            <h3>
+              ◷ Mission history{" "}
+              <b>{String(progress.missionCount).padStart(2, "0")}</b>
+            </h3>
+            <span>ALL ACTIVITY / FRIEND #{friend.tokenId}</span>
+          </div>
+          <div className="history-list">
+            {progress.history.length ? (
+              progress.history.map((item) => (
+                <article key={item.receiptId}>
+                  <Spark />
+                  <div>
+                    <strong>{item.missionName}</strong>
+                    <p>{item.request}</p>
+                    <small>
+                      {item.skillName ?? "Native operator ability"} · V
+                      {(item.reviews?.length ?? 0) + 1} ·{" "}
+                      {new Date(item.completedAt).toLocaleString()}
+                    </small>
+                  </div>
+                  <aside>
+                    <b>
+                      -
+                      {item.rfSpent +
+                        (item.reviews ?? []).reduce(
+                          (total, review) => total + review.rfSpent,
+                          0,
+                        )}{" "}
+                      RF
+                    </b>
+                    <span>
+                      +{item.xpEarned} XP · {item.reviews?.length ?? 0} REVIEWS
+                    </span>
+                    <small>{item.receiptId}</small>
+                  </aside>
+                </article>
+              ))
+            ) : (
+              <article className="empty">
+                <Spark />
+                <div>
+                  <strong>No missions yet for {friend.name}.</strong>
+                  <p>
+                    Your Friend’s completed work and receipts will live here.
+                  </p>
+                </div>
+                <span>↘</span>
+              </article>
+            )}
+          </div>
+        </section>
+        <section className="about" ref={aboutRef}>
+          <Spark />
+          <p>
+            FriendOS gives Rare Friends useful work, visible costs, and a memory
+            that grows with every mission.
+          </p>
+          <div>
+            <span>LEVEL {String(level.level).padStart(2, "0")}</span>
+            <b>{progress.xp} XP</b>
+            <i style={{ width: `${Math.max(3, level.percent)}%` }} />
+          </div>
+        </section>
+      </main>
+      <footer>
+        <div className="brand">
+          <Spark />
+          friend<span>OS</span>
+        </div>
+        <p>THE OPERATING SYSTEM FOR YOUR FRIEND</p>
+        <strong>Your Friend can think, work, and spend.</strong>
+        <small>VIBEATHON PROTOTYPE · RF SPENDING AND BURNS ARE SIMULATED</small>
+      </footer>
+      <MissionOverlay
+        overlay={overlay}
+        friend={friend}
+        step={step}
+        report={report}
+        receipt={receipt}
+        agentSource={agentSource}
+        reviewing={reviewing}
+        installedSkills={progress.installedSkills}
+        balance={progress.balance}
+        onInstall={(skillId) => {
+          const skill = skillCatalog.find((item) => item.id === skillId);
+          return skill
+            ? rawInstallSkill(friend.tokenId, skill.id, skill.price)
+            : false;
+        }}
+        onReview={runMissionReview}
+        onVersion={setReport}
+        onAccept={(version, memories) => {
+          if (
+            receipt &&
+            acceptMissionVersion(
+              friend.tokenId,
+              receipt.receiptId,
+              version,
+              memories,
+            )
+          )
+            setReceipt({
+              ...receipt,
+              acceptedVersion: version,
+              status: "accepted",
+            });
+        }}
+        onContinue={() => receipt && continueMission(receipt)}
+        onClose={() => setOverlay("none")}
+      />
+      <AnimatePresence>
+        {showCapabilities && (
+          <motion.div
+            className="purchase-overlay capability-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <section>
+              <button onClick={() => setShowCapabilities(false)}>×</button>
+              <span>{friend.name.toUpperCase()} / CAPABILITIES</span>
+              <h2>What can this operator do?</h2>
+              <p>
+                {friend.name} combines its {friend.archetype.toLowerCase()}{" "}
+                identity with every skill installed on NFT #{friend.tokenId}.
+                This list updates automatically when a new skill is acquired.
+              </p>
+              <div className="capability-list">
+                {progress.installedSkills.map((id) => {
+                  const skill = skillCatalog.find((item) => item.id === id);
+                  const mastery = progress.skillMastery[id] ?? 0;
+                  return skill ? (
+                    <article key={id}>
+                      <i>{skill.icon}</i>
+                      <div>
+                        <strong>{skill.name}</strong>
+                        <p>{skill.description}</p>
+                        <small>
+                          Best for:{" "}
+                          {missions
+                            .filter((mission) => mission.skillId === id)
+                            .map((mission) => mission.name)
+                            .join(", ") || "Specialized community tasks"}
+                        </small>
+                      </div>
+                      <aside>
+                        RANK {Math.floor(mastery / 100) + 1}
+                        <span>{mastery} XP</span>
+                      </aside>
+                    </article>
+                  ) : null;
+                })}
+              </div>
+              <div className="native-capabilities">
+                <strong>NATIVE OPERATOR TRAITS</strong>
+                <span>{friend.primarySkill}</span>
+                <span>{friend.secondarySkill}</span>
+                {friend.traits.map((trait) => (
+                  <span key={trait}>{trait}</span>
+                ))}
+              </div>
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showAgentSkills && (
+          <motion.div
+            className="purchase-overlay skills-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <section>
+              <button onClick={() => setShowAgentSkills(false)}>×</button>
+              <span>{friend.name.toUpperCase()} / ACQUIRED SKILLS</span>
+              <h2>Abilities that grow through work.</h2>
+              <p>
+                Relevant missions train the skill they use. Installed skills
+                earn 25 mastery XP per matching task; baseline ability earns
+                only 8 XP.
+              </p>
+              <div className="mastery-list">
+                {progress.installedSkills.map((id) => {
+                  const skill = skillCatalog.find((item) => item.id === id);
+                  const mastery = progress.skillMastery[id] ?? 0;
+                  const rank = Math.floor(mastery / 100) + 1;
+                  return skill ? (
+                    <article key={id}>
+                      <i>{skill.icon}</i>
+                      <div>
+                        <strong>{skill.name}</strong>
+                        <small>{skill.description}</small>
+                        <span>
+                          <b style={{ width: `${mastery % 100}%` }} />
+                        </span>
+                      </div>
+                      <aside>
+                        RANK {rank}
+                        <small>{mastery} MASTERY XP</small>
+                        <em>{skill.usageCost} RF / USE</em>
+                      </aside>
+                    </article>
+                  ) : null;
+                })}
+              </div>
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {pendingSkill && (
+          <motion.div
+            className="purchase-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <section>
+              <button onClick={() => setPendingSkill(null)}>×</button>
+              <span>CONFIRM SKILL INSTALLATION</span>
+              <h2>Who will learn {pendingSkill.name}?</h2>
+              <p>
+                This skill is installed on one operator profile and paid from
+                that operator’s RF wallet.
+              </p>
+              <div className="agent-purchase-list">
+                {identities.map((item) => {
+                  const itemProgress = {
+                    ...initialProgress(),
+                    ...friendsProgress[item.tokenId],
+                  };
+                  return (
+                    <label
+                      key={item.tokenId}
+                      className={
+                        purchaseAgentId === item.tokenId ? "selected" : ""
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="purchase-agent"
+                        checked={purchaseAgentId === item.tokenId}
+                        onChange={() => setPurchaseAgentId(item.tokenId)}
+                      />
+                      <OperatorAvatar friend={item} compact />
+                      <span>
+                        <strong>{item.name}</strong>#{item.tokenId} ·{" "}
+                        {itemProgress.balance} RF
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="purchase-total">
+                <span>TOTAL</span>
+                <strong>{pendingSkill.price} RF</strong>
+              </div>
+              <button
+                className="confirm-purchase"
+                onClick={() => {
+                  rawInstallSkill(
+                    purchaseAgentId,
+                    pendingSkill.id,
+                    pendingSkill.price,
+                  );
+                  setPendingSkill(null);
+                }}
+              >
+                Confirm and install ↗
+              </button>
+            </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {showOnboarding && (
+        <Onboarding
+          wallet={wallet}
+          onClose={() => {
+            localStorage.setItem("friendos-onboarded", "yes");
+            setShowOnboarding(false);
+          }}
+        />
+      )}
+      <dialog id="skill-spec" className="skill-dialog">
+        <button
+          onClick={() =>
+            (
+              document.getElementById("skill-spec") as HTMLDialogElement
+            )?.close()
+          }
+        >
+          ×
+        </button>
+        <span>FRIENDOS SKILL STANDARD / V0.1</span>
+        <h2>Give every Friend a new ability.</h2>
+        <p>
+          Register a unique skill ID, developer identity, capability
+          description, install price, per-use RF cost, and a secure execution
+          endpoint. Installed skill IDs are stored against each NFT operator
+          profile.
+        </p>
+        <code>{`{ id, name, developer, category, installPrice, usageCost, endpoint }`}</code>
+      </dialog>
+    </div>
+  );
+}
+
+function AgentProfilePage({
+  friend,
+  progress,
+  level,
+  evolution,
+  identities,
+  selectedId,
+  onSelect,
+  onBack,
+  onFund,
+  onPolicy,
+}: {
+  friend: ReturnType<typeof createFriendIdentity>;
+  progress: FriendProgress;
+  level: ReturnType<typeof levelFromXp>;
+  evolution: string;
+  identities: ReturnType<typeof createFriendIdentity>[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onBack: () => void;
+  onFund: (amount: number) => boolean;
+  onPolicy: (daily: number, mission: number, auto: boolean) => void;
+}) {
+  const [fundAmount, setFundAmount] = useState(25);
+  const [dailyLimit, setDailyLimit] = useState(progress.dailyLimit);
+  const [missionLimit, setMissionLimit] = useState(progress.perMissionLimit);
+  const [autoApprove, setAutoApprove] = useState(progress.autoApprove);
+  const address =
+    friend.walletAddress ??
+    `0xFriend${friend.tokenId.padStart(8, "0")}…${friend.tokenId.slice(-4)}`;
+  const installed = skillCatalog.filter((skill) =>
+    progress.installedSkills.includes(skill.id),
+  );
+  return (
+    <section className="agent-page">
+      <button className="back-link" onClick={onBack}>
+        ← Back to workspace
+      </button>
+      <div className="profile-hero">
+        <div className={`profile-avatar evolution-${level.level}`}>
+          <PixelFriend friend={friend} />
+          <span>LV.{level.level}</span>
+        </div>
+        <div>
+          <small>
+            GENERATIONS #{friend.tokenId} /{" "}
+            {friend.familyName ?? `GEN ${friend.generation}`}
+          </small>
+          <h1>
+            {friend.name}
+            <em>.</em>
+          </h1>
+          <p>
+            The {friend.traits[0]} {friend.archetype} · {evolution}
+          </p>
+          <div className="profile-pills">
+            <span>{progress.missionCount} MISSIONS</span>
+            <span>{progress.xp} XP</span>
+            <span>{installed.length} SKILLS</span>
+          </div>
+        </div>
+        <label>
+          SELECT OPERATOR
+          <select
+            value={selectedId}
+            onChange={(event) => onSelect(event.target.value)}
+          >
+            {identities.map((item) => (
+              <option key={item.tokenId} value={item.tokenId}>
+                {item.name} · #{item.tokenId}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="profile-grid">
+        <article className="wallet-panel">
+          <header>
+            <div>
+              <small>FRIEND WALLET</small>
+              <h2>
+                {progress.balance} <span>RF</span>
+              </h2>
+            </div>
+            <b>● ACTIVE</b>
+          </header>
+          <p className="wallet-address">
+            {address}
+            <button onClick={() => navigator.clipboard?.writeText(address)}>
+              COPY
+            </button>
+          </p>
+          <div className="fund-row">
+            <label>
+              FUND THIS WALLET
+              <input
+                aria-label="Funding amount"
+                type="number"
+                min="1"
+                value={fundAmount}
+                onChange={(event) => setFundAmount(Number(event.target.value))}
+              />
+            </label>
+            <button onClick={() => onFund(fundAmount)}>
+              Add {fundAmount || 0} RF ↗
+            </button>
+          </div>
+          <div className="policy">
+            <h3>Spending controls</h3>
+            <label>
+              DAILY LIMIT
+              <input
+                aria-label="Daily spending limit"
+                type="number"
+                min="0"
+                value={dailyLimit}
+                onChange={(event) => setDailyLimit(Number(event.target.value))}
+              />
+              <span>RF</span>
+            </label>
+            <label>
+              PER-MISSION LIMIT
+              <input
+                aria-label="Per-mission spending limit"
+                type="number"
+                min="0"
+                value={missionLimit}
+                onChange={(event) =>
+                  setMissionLimit(Number(event.target.value))
+                }
+              />
+              <span>RF</span>
+            </label>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={autoApprove}
+                onChange={(event) => setAutoApprove(event.target.checked)}
+              />
+              <span /> Auto-approve within limits
+            </label>
+            <button
+              onClick={() => onPolicy(dailyLimit, missionLimit, autoApprove)}
+            >
+              Save spending policy
+            </button>
+          </div>
+        </article>
+        <article className="profile-detail">
+          <div className="detail-block">
+            <small>INSTALLED SKILLS</small>
+            {installed.map((skill) => (
+              <p key={skill.id}>
+                <i>{skill.icon}</i>
+                <span>
+                  <strong>{skill.name}</strong>
+                  {skill.developer}
+                </span>
+                <b>{skill.usageCost} RF / USE</b>
+              </p>
+            ))}
+          </div>
+          <div className="detail-block operator-memory">
+            <small>OPERATOR MEMORY · {(progress.memories ?? []).length}</small>
+            {(progress.memories ?? []).length ? (progress.memories ?? []).map((memory) => <p key={memory.id}><i>✦</i><span><strong>{memory.type.replace('-', ' ').toUpperCase()}</strong>{memory.content}</span><b>{memory.sourceReceiptId}</b></p>) : <p className="no-transactions">Accept a mission result and choose what this operator should remember.</p>}
+          </div>
+          <div className="detail-block transactions">
+            <small>WALLET ACTIVITY</small>
+            {progress.transactions.length ? (
+              progress.transactions.map((tx) => (
+                <p key={tx.id}>
+                  <span>
+                    <strong>{tx.label}</strong>
+                    {new Date(tx.createdAt).toLocaleString()}
+                  </span>
+                  <b className={tx.amount > 0 ? "credit" : ""}>
+                    {tx.amount > 0 ? "+" : ""}
+                    {tx.amount} RF
+                  </b>
+                </p>
+              ))
+            ) : (
+              <p className="no-transactions">
+                No transactions yet. Fund the wallet or launch a mission to
+                begin.
+              </p>
+            )}
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function WalletSessionCard({
+  wallet,
+  onGuide,
+}: {
+  wallet: ReturnType<typeof useWallet>;
+  onGuide: () => void;
+}) {
+  return (
+    <section className="wallet-session">
+      {wallet.account ? (
+        <>
+          <div>
+            <span>CONNECTED WALLET</span>
+            <strong>
+              {wallet.account.slice(0, 8)}…{wallet.account.slice(-6)}
+            </strong>
+          </div>
+          <div>
+            <span>$RAREFRIENDS</span>
+            <strong>{wallet.rfBalance} RF</strong>
+          </div>
+          <div>
+            <span>OPERATORS</span>
+            <strong>{wallet.ownedFriends.length} / 3</strong>
+          </div>
+          <b className={wallet.signedIn ? "verified" : ""}>
+            {wallet.signedIn ? "✓ SIGNED IN" : "SIGNATURE NEEDED"}
+          </b>
+          {!wallet.signedIn && (
+            <button onClick={wallet.signIn}>Sign to verify ↗</button>
+          )}
+          <button onClick={wallet.disconnect}>Disconnect</button>
+        </>
+      ) : (
+        <>
+          <p>
+            Connect and sign to load up to three operators and your spendable RF
+            balance.
+          </p>
+          <button onClick={onGuide}>Start setup ↗</button>
+        </>
+      )}
+    </section>
+  );
+}
+
+function Onboarding({
+  wallet,
+  onClose,
+}: {
+  wallet: ReturnType<typeof useWallet>;
+  onClose: () => void;
+}) {
+  const step = !wallet.account ? 1 : !wallet.signedIn ? 2 : 3;
+  return (
+    <div className="onboarding">
+      <section>
+        <span>WELCOME TO FRIENDOS</span>
+        <h2>Bring your operators online.</h2>
+        <p>
+          We’ll verify your wallet, discover up to three Rare Friends, and read
+          the RF balance they can use. Signing is free and does not create a
+          transaction.
+        </p>
+        <ol>
+          <li className={step >= 1 ? "active" : ""}>
+            <b>01</b>
+            <div>
+              <strong>Connect wallet</strong>
+              <small>Choose an injected wallet on Robinhood Chain.</small>
+            </div>
+            {wallet.account ? (
+              "✓"
+            ) : (
+              <button onClick={wallet.connect}>Connect</button>
+            )}
+          </li>
+          <li className={step >= 2 ? "active" : ""}>
+            <b>02</b>
+            <div>
+              <strong>Sign in</strong>
+              <small>
+                Prove this session belongs to you. No gas or spending.
+              </small>
+            </div>
+            {wallet.signedIn ? (
+              "✓"
+            ) : (
+              <button disabled={!wallet.account} onClick={wallet.signIn}>
+                Sign message
+              </button>
+            )}
+          </li>
+          <li className={step >= 3 ? "active" : ""}>
+            <b>03</b>
+            <div>
+              <strong>Load operators + RF</strong>
+              <small>
+                {wallet.loadingFriends
+                  ? "Reading onchain data…"
+                  : `${wallet.ownedFriends.length} operators found · ${wallet.rfBalance} RF`}
+              </small>
+            </div>
+            {wallet.signedIn ? "✓" : "○"}
+          </li>
+        </ol>
+        <button
+          className="finish-setup"
+          disabled={!wallet.signedIn}
+          onClick={onClose}
+        >
+          Enter FriendOS ↗
+        </button>
+        <button className="skip-setup" onClick={onClose}>
+          Explore first
+        </button>
       </section>
-      <p className="friend-promise">✦ Every mission is completed by your Friend, not a generic assistant.</p>
-      <section className="skills-market"><div className="section-rule"><b>03</b> SKILL MARKETPLACE <span /></div><div className="skills-heading"><div><small>EXPAND WHAT YOUR FRIEND CAN DO</small><h2>New abilities, built by anyone<em>.</em></h2></div><p>Skills belong to this operator. Install a community-built ability and it stays with their profile as they evolve.</p></div><div className="skill-grid">{skillCatalog.map((skill) => { const installed = progress.installedSkills.includes(skill.id); return <article key={skill.id}><div><i>{skill.icon}</i><span>{skill.category}</span></div><h3>{skill.name}</h3><p>{skill.description}</p><small>{skill.developer}</small><button disabled={installed || progress.balance < skill.price} onClick={() => installSkill(skill.id)}>{installed ? 'INSTALLED ✓' : skill.price ? `INSTALL · ${skill.price} RF` : 'INSTALL FREE'}</button></article> })}</div><div className="developer-callout"><span>BUILD FOR FRIENDOS</span><p>External developers can publish skills with a name, capability, price, and execution endpoint.</p><button onClick={() => (document.getElementById('skill-spec') as HTMLDialogElement)?.showModal()}>View developer spec ↗</button></div></section>
-      <section className="economy" ref={activityRef}><div className="section-rule"><b>03</b> THE ECONOMY OF DOING <span /></div><div className="economy-heading"><div><small>EVERY RF TELLS A STORY</small><h2>Work, not just words<em>.</em></h2></div><p>Real output. Visible cost. A growing record of what your Friend has done.</p></div><div className="economy-cards"><EconomyCard label="AVAILABLE BALANCE" value={progress.balance} note="Operating budget" icon="◇" /><EconomyCard label="LIFETIME RF SPENT" value={progress.rfSpent} note="Invested in useful work" icon="✳" /><EconomyCard label="LIFETIME RF BURNED" value={progress.rfBurned} note="Removed from circulation" icon="♨" /></div><div className="history-head"><h3>◷ Mission history <b>{String(progress.missionCount).padStart(2, '0')}</b></h3><span>ALL ACTIVITY / FRIEND #{friend.tokenId}</span></div><div className="history-list">{progress.history.length ? progress.history.map((item) => <article key={item.receiptId}><Spark /><div><strong>{item.missionName}</strong><p>{item.request}</p><small>{item.skillName ?? 'Native operator ability'} · V{(item.reviews?.length ?? 0) + 1} · {new Date(item.completedAt).toLocaleString()}</small></div><aside><b>-{item.rfSpent + (item.reviews ?? []).reduce((total, review) => total + review.rfSpent, 0)} RF</b><span>+{item.xpEarned} XP · {(item.reviews?.length ?? 0)} REVIEWS</span><small>{item.receiptId}</small></aside></article>) : <article className="empty"><Spark /><div><strong>No missions yet for {friend.name}.</strong><p>Your Friend’s completed work and receipts will live here.</p></div><span>↘</span></article>}</div></section>
-      <section className="about" ref={aboutRef}><Spark /><p>FriendOS gives Rare Friends useful work, visible costs, and a memory that grows with every mission.</p><div><span>LEVEL {String(level.level).padStart(2, '0')}</span><b>{progress.xp} XP</b><i style={{ width: `${Math.max(3, level.percent)}%` }} /></div></section>
-    </main>
-    <footer><div className="brand"><Spark />friend<span>OS</span></div><p>THE OPERATING SYSTEM FOR YOUR FRIEND</p><strong>Your Friend can think, work, and spend.</strong><small>VIBEATHON PROTOTYPE · RF SPENDING AND BURNS ARE SIMULATED</small></footer>
-    <MissionOverlay overlay={overlay} friend={friend} step={step} report={report} receipt={receipt} agentSource={agentSource} reviewing={reviewing} installedSkills={progress.installedSkills} balance={progress.balance} onInstall={(skillId) => { const skill = skillCatalog.find((item) => item.id === skillId); return skill ? rawInstallSkill(friend.tokenId, skill.id, skill.price) : false }} onReview={runMissionReview} onVersion={setReport} onClose={() => setOverlay('none')} />
-    <AnimatePresence>{showCapabilities && <motion.div className="purchase-overlay capability-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><section><button onClick={() => setShowCapabilities(false)}>×</button><span>{friend.name.toUpperCase()} / CAPABILITIES</span><h2>What can this operator do?</h2><p>{friend.name} combines its {friend.archetype.toLowerCase()} identity with every skill installed on NFT #{friend.tokenId}. This list updates automatically when a new skill is acquired.</p><div className="capability-list">{progress.installedSkills.map((id) => { const skill = skillCatalog.find((item) => item.id === id); const mastery = progress.skillMastery[id] ?? 0; return skill ? <article key={id}><i>{skill.icon}</i><div><strong>{skill.name}</strong><p>{skill.description}</p><small>Best for: {missions.filter((mission) => mission.skillId === id).map((mission) => mission.name).join(', ') || 'Specialized community tasks'}</small></div><aside>RANK {Math.floor(mastery / 100) + 1}<span>{mastery} XP</span></aside></article> : null })}</div><div className="native-capabilities"><strong>NATIVE OPERATOR TRAITS</strong><span>{friend.primarySkill}</span><span>{friend.secondarySkill}</span>{friend.traits.map((trait) => <span key={trait}>{trait}</span>)}</div></section></motion.div>}</AnimatePresence>
-    <AnimatePresence>{showAgentSkills && <motion.div className="purchase-overlay skills-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><section><button onClick={() => setShowAgentSkills(false)}>×</button><span>{friend.name.toUpperCase()} / ACQUIRED SKILLS</span><h2>Abilities that grow through work.</h2><p>Relevant missions train the skill they use. Installed skills earn 25 mastery XP per matching task; baseline ability earns only 8 XP.</p><div className="mastery-list">{progress.installedSkills.map((id) => { const skill = skillCatalog.find((item) => item.id === id); const mastery = progress.skillMastery[id] ?? 0; const rank = Math.floor(mastery / 100) + 1; return skill ? <article key={id}><i>{skill.icon}</i><div><strong>{skill.name}</strong><small>{skill.description}</small><span><b style={{ width: `${mastery % 100}%` }} /></span></div><aside>RANK {rank}<small>{mastery} MASTERY XP</small><em>{skill.usageCost} RF / USE</em></aside></article> : null })}</div></section></motion.div>}</AnimatePresence>
-    <AnimatePresence>{pendingSkill && <motion.div className="purchase-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><section><button onClick={() => setPendingSkill(null)}>×</button><span>CONFIRM SKILL INSTALLATION</span><h2>Who will learn {pendingSkill.name}?</h2><p>This skill is installed on one operator profile and paid from that operator’s RF wallet.</p><div className="agent-purchase-list">{identities.map((item) => { const itemProgress = { ...initialProgress(), ...friendsProgress[item.tokenId] }; return <label key={item.tokenId} className={purchaseAgentId === item.tokenId ? 'selected' : ''}><input type="radio" name="purchase-agent" checked={purchaseAgentId === item.tokenId} onChange={() => setPurchaseAgentId(item.tokenId)} /><OperatorAvatar friend={item} compact /><span><strong>{item.name}</strong>#{item.tokenId} · {itemProgress.balance} RF</span></label> })}</div><div className="purchase-total"><span>TOTAL</span><strong>{pendingSkill.price} RF</strong></div><button className="confirm-purchase" onClick={() => { rawInstallSkill(purchaseAgentId, pendingSkill.id, pendingSkill.price); setPendingSkill(null) }}>Confirm and install ↗</button></section></motion.div>}</AnimatePresence>
-    {showOnboarding && <Onboarding wallet={wallet} onClose={() => { localStorage.setItem('friendos-onboarded', 'yes'); setShowOnboarding(false) }} />}
-    <dialog id="skill-spec" className="skill-dialog"><button onClick={() => (document.getElementById('skill-spec') as HTMLDialogElement)?.close()}>×</button><span>FRIENDOS SKILL STANDARD / V0.1</span><h2>Give every Friend a new ability.</h2><p>Register a unique skill ID, developer identity, capability description, install price, per-use RF cost, and a secure execution endpoint. Installed skill IDs are stored against each NFT operator profile.</p><code>{`{ id, name, developer, category, installPrice, usageCost, endpoint }`}</code></dialog>
-  </div>
+    </div>
+  );
 }
 
-function AgentProfilePage({ friend, progress, level, evolution, identities, selectedId, onSelect, onBack, onFund, onPolicy }: { friend: ReturnType<typeof createFriendIdentity>; progress: FriendProgress; level: ReturnType<typeof levelFromXp>; evolution: string; identities: ReturnType<typeof createFriendIdentity>[]; selectedId: string; onSelect: (id: string) => void; onBack: () => void; onFund: (amount: number) => boolean; onPolicy: (daily: number, mission: number, auto: boolean) => void }) {
-  const [fundAmount, setFundAmount] = useState(25)
-  const [dailyLimit, setDailyLimit] = useState(progress.dailyLimit)
-  const [missionLimit, setMissionLimit] = useState(progress.perMissionLimit)
-  const [autoApprove, setAutoApprove] = useState(progress.autoApprove)
-  const address = friend.walletAddress ?? `0xFriend${friend.tokenId.padStart(8, '0')}…${friend.tokenId.slice(-4)}`
-  const installed = skillCatalog.filter((skill) => progress.installedSkills.includes(skill.id))
-  return <section className="agent-page"><button className="back-link" onClick={onBack}>← Back to workspace</button><div className="profile-hero"><div className={`profile-avatar evolution-${level.level}`}><PixelFriend friend={friend} /><span>LV.{level.level}</span></div><div><small>GENERATIONS #{friend.tokenId} / {friend.familyName ?? `GEN ${friend.generation}`}</small><h1>{friend.name}<em>.</em></h1><p>The {friend.traits[0]} {friend.archetype} · {evolution}</p><div className="profile-pills"><span>{progress.missionCount} MISSIONS</span><span>{progress.xp} XP</span><span>{installed.length} SKILLS</span></div></div><label>SELECT OPERATOR<select value={selectedId} onChange={(event) => onSelect(event.target.value)}>{identities.map((item) => <option key={item.tokenId} value={item.tokenId}>{item.name} · #{item.tokenId}</option>)}</select></label></div><div className="profile-grid"><article className="wallet-panel"><header><div><small>FRIEND WALLET</small><h2>{progress.balance} <span>RF</span></h2></div><b>● ACTIVE</b></header><p className="wallet-address">{address}<button onClick={() => navigator.clipboard?.writeText(address)}>COPY</button></p><div className="fund-row"><label>FUND THIS WALLET<input aria-label="Funding amount" type="number" min="1" value={fundAmount} onChange={(event) => setFundAmount(Number(event.target.value))} /></label><button onClick={() => onFund(fundAmount)}>Add {fundAmount || 0} RF ↗</button></div><div className="policy"><h3>Spending controls</h3><label>DAILY LIMIT<input aria-label="Daily spending limit" type="number" min="0" value={dailyLimit} onChange={(event) => setDailyLimit(Number(event.target.value))} /><span>RF</span></label><label>PER-MISSION LIMIT<input aria-label="Per-mission spending limit" type="number" min="0" value={missionLimit} onChange={(event) => setMissionLimit(Number(event.target.value))} /><span>RF</span></label><label className="toggle"><input type="checkbox" checked={autoApprove} onChange={(event) => setAutoApprove(event.target.checked)} /><span /> Auto-approve within limits</label><button onClick={() => onPolicy(dailyLimit, missionLimit, autoApprove)}>Save spending policy</button></div></article><article className="profile-detail"><div className="detail-block"><small>INSTALLED SKILLS</small>{installed.map((skill) => <p key={skill.id}><i>{skill.icon}</i><span><strong>{skill.name}</strong>{skill.developer}</span><b>{skill.usageCost} RF / USE</b></p>)}</div><div className="detail-block transactions"><small>WALLET ACTIVITY</small>{progress.transactions.length ? progress.transactions.map((tx) => <p key={tx.id}><span><strong>{tx.label}</strong>{new Date(tx.createdAt).toLocaleString()}</span><b className={tx.amount > 0 ? 'credit' : ''}>{tx.amount > 0 ? '+' : ''}{tx.amount} RF</b></p>) : <p className="no-transactions">No transactions yet. Fund the wallet or launch a mission to begin.</p>}</div></article></div></section>
+function TrainingLab() {
+  const [minted, setMinted] = useState(false);
+  const [name, setName] = useState("");
+  const [specialty, setSpecialty] = useState("Blockchain analytics");
+  const [level, setLevel] = useState(1);
+  const [decision, setDecision] = useState<string | null>(null);
+  return (
+    <section className="training-lab">
+      <div className="section-rule">
+        <b>02</b> TRAIN A SKILL NFT <span />
+      </div>
+      <div className="training-grid">
+        <div>
+          <small>NO CODE REQUIRED</small>
+          <h2>
+            Train expertise.
+            <br />
+            <em>Prove it works.</em>
+          </h2>
+          <p>
+            Mint a free trainee, choose its specialty, and guide its research.
+            Your approvals build its judgment. At higher levels it accepts
+            public tasks; verified accuracy and completion rates determine its
+            marketplace price.
+          </p>
+          <div className="training-flow">
+            <span>MINT</span>
+            <i>→</i>
+            <span>TRAIN</span>
+            <i>→</i>
+            <span>PROVE</span>
+            <i>→</i>
+            <span>SELL SKILL</span>
+          </div>
+        </div>
+        <article>
+          {!minted ? (
+            <>
+              <span>FREE TRAINER MINT</span>
+              <h3>Create your trainee</h3>
+              <label>
+                NAME
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Chain Scout"
+                />
+              </label>
+              <label>
+                SPECIALTY
+                <select
+                  value={specialty}
+                  onChange={(event) => setSpecialty(event.target.value)}
+                >
+                  <option>Blockchain analytics</option>
+                  <option>Crypto trading</option>
+                  <option>Sports intelligence</option>
+                  <option>Onchain gaming</option>
+                </select>
+              </label>
+              <button disabled={!name.trim()} onClick={() => setMinted(true)}>
+                Mint free training NFT ↗
+              </button>
+            </>
+          ) : (
+            <>
+              <span>TRAINING NFT · LEVEL {level}</span>
+              <h3>{name}</h3>
+              <p className="training-question">
+                <strong>Approval request</strong>Ethereum validator exits rose
+                18% week-over-week while staking deposits remained flat. Should
+                I treat this as a bearish liquidity signal in my next community
+                report?
+                <small>
+                  Reason: sustained net exits can increase liquid ETH supply,
+                  but the current sample is only seven days. Sources:{" "}
+                  <a href="https://beaconcha.in" target="_blank">
+                    Beaconcha.in ↗
+                  </a>{" "}
+                  ·{" "}
+                  <a href="https://dune.com" target="_blank">
+                    Dune Analytics ↗
+                  </a>
+                </small>
+              </p>
+              {decision ? (
+                <div className="training-result">
+                  Decision recorded: {decision}. Judgment XP +25.
+                </div>
+              ) : (
+                <div className="decision-row">
+                  <button
+                    onClick={() => {
+                      setDecision("Approved with caution");
+                      setLevel(2);
+                    }}
+                  >
+                    Approve with caution
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDecision("Rejected");
+                      setLevel(2);
+                    }}
+                  >
+                    Reject conclusion
+                  </button>
+                </div>
+              )}
+              <div className="trainer-progress">
+                <span style={{ width: `${level * 20}%` }} />
+                <small>
+                  LEVEL {level} ·{" "}
+                  {level >= 5
+                    ? "READY FOR PUBLIC TASKS"
+                    : `${5 - level} LEVELS TO PUBLIC TASKS`}
+                </small>
+              </div>
+            </>
+          )}
+        </article>
+      </div>
+    </section>
+  );
 }
 
-function WalletSessionCard({ wallet, onGuide }: { wallet: ReturnType<typeof useWallet>; onGuide: () => void }) { return <section className="wallet-session">{wallet.account ? <><div><span>CONNECTED WALLET</span><strong>{wallet.account.slice(0, 8)}…{wallet.account.slice(-6)}</strong></div><div><span>$RAREFRIENDS</span><strong>{wallet.rfBalance} RF</strong></div><div><span>OPERATORS</span><strong>{wallet.ownedFriends.length} / 3</strong></div><b className={wallet.signedIn ? 'verified' : ''}>{wallet.signedIn ? '✓ SIGNED IN' : 'SIGNATURE NEEDED'}</b>{!wallet.signedIn && <button onClick={wallet.signIn}>Sign to verify ↗</button>}<button onClick={wallet.disconnect}>Disconnect</button></> : <><p>Connect and sign to load up to three operators and your spendable RF balance.</p><button onClick={onGuide}>Start setup ↗</button></>}</section> }
-
-function Onboarding({ wallet, onClose }: { wallet: ReturnType<typeof useWallet>; onClose: () => void }) { const step = !wallet.account ? 1 : !wallet.signedIn ? 2 : 3; return <div className="onboarding"><section><span>WELCOME TO FRIENDOS</span><h2>Bring your operators online.</h2><p>We’ll verify your wallet, discover up to three Rare Friends, and read the RF balance they can use. Signing is free and does not create a transaction.</p><ol><li className={step >= 1 ? 'active' : ''}><b>01</b><div><strong>Connect wallet</strong><small>Choose an injected wallet on Robinhood Chain.</small></div>{wallet.account ? '✓' : <button onClick={wallet.connect}>Connect</button>}</li><li className={step >= 2 ? 'active' : ''}><b>02</b><div><strong>Sign in</strong><small>Prove this session belongs to you. No gas or spending.</small></div>{wallet.signedIn ? '✓' : <button disabled={!wallet.account} onClick={wallet.signIn}>Sign message</button>}</li><li className={step >= 3 ? 'active' : ''}><b>03</b><div><strong>Load operators + RF</strong><small>{wallet.loadingFriends ? 'Reading onchain data…' : `${wallet.ownedFriends.length} operators found · ${wallet.rfBalance} RF`}</small></div>{wallet.signedIn ? '✓' : '○'}</li></ol><button className="finish-setup" disabled={!wallet.signedIn} onClick={onClose}>Enter FriendOS ↗</button><button className="skip-setup" onClick={onClose}>Explore first</button></section></div> }
-
-function TrainingLab() { const [minted, setMinted] = useState(false); const [name, setName] = useState(''); const [specialty, setSpecialty] = useState('Blockchain analytics'); const [level, setLevel] = useState(1); const [decision, setDecision] = useState<string | null>(null); return <section className="training-lab"><div className="section-rule"><b>02</b> TRAIN A SKILL NFT <span /></div><div className="training-grid"><div><small>NO CODE REQUIRED</small><h2>Train expertise.<br /><em>Prove it works.</em></h2><p>Mint a free trainee, choose its specialty, and guide its research. Your approvals build its judgment. At higher levels it accepts public tasks; verified accuracy and completion rates determine its marketplace price.</p><div className="training-flow"><span>MINT</span><i>→</i><span>TRAIN</span><i>→</i><span>PROVE</span><i>→</i><span>SELL SKILL</span></div></div><article>{!minted ? <><span>FREE TRAINER MINT</span><h3>Create your trainee</h3><label>NAME<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Chain Scout" /></label><label>SPECIALTY<select value={specialty} onChange={(event) => setSpecialty(event.target.value)}><option>Blockchain analytics</option><option>Crypto trading</option><option>Sports intelligence</option><option>Onchain gaming</option></select></label><button disabled={!name.trim()} onClick={() => setMinted(true)}>Mint free training NFT ↗</button></> : <><span>TRAINING NFT · LEVEL {level}</span><h3>{name}</h3><p className="training-question"><strong>Approval request</strong>Ethereum validator exits rose 18% week-over-week while staking deposits remained flat. Should I treat this as a bearish liquidity signal in my next community report?<small>Reason: sustained net exits can increase liquid ETH supply, but the current sample is only seven days. Sources: <a href="https://beaconcha.in" target="_blank">Beaconcha.in ↗</a> · <a href="https://dune.com" target="_blank">Dune Analytics ↗</a></small></p>{decision ? <div className="training-result">Decision recorded: {decision}. Judgment XP +25.</div> : <div className="decision-row"><button onClick={() => { setDecision('Approved with caution'); setLevel(2) }}>Approve with caution</button><button onClick={() => { setDecision('Rejected'); setLevel(2) }}>Reject conclusion</button></div>}<div className="trainer-progress"><span style={{ width: `${level * 20}%` }} /><small>LEVEL {level} · {level >= 5 ? 'READY FOR PUBLIC TASKS' : `${5 - level} LEVELS TO PUBLIC TASKS`}</small></div></>}</article></div></section> }
-
-function Spark() { return <i className="spark" aria-hidden="true">✦</i> }
-function OperatorAvatar({ friend, compact = false }: { friend: ReturnType<typeof createFriendIdentity>; compact?: boolean }) { return <span className={`operator-avatar avatar-${friend.avatarIndex ?? Number(BigInt(friend.tokenId) % 3n)} ${compact ? 'compact' : ''}`} role="img" aria-label={`${friend.name} operator avatar`} /> }
-function PixelFriend({ friend, compact = false }: { friend: ReturnType<typeof createFriendIdentity>; compact?: boolean }) { return <OperatorAvatar friend={friend} compact={compact} /> }
-function BootScreen({ friend }: { friend: ReturnType<typeof createFriendIdentity> }) { return <motion.div className="boot-screen" initial={{ opacity: 1 }} exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: .35 }}><OperatorAvatar friend={friend} /><strong>friend<span>OS</span></strong><p>BRINGING YOUR FRIEND ONLINE</p><i><b /></i></motion.div> }
-function Stat({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div> }
-function EconomyCard({ label, value, note, icon }: { label: string; value: number; note: string; icon: string }) { return <article><span>{label}</span><i>{icon}</i><strong>{value}<small> RF</small></strong><p>{note}</p></article> }
-function MissionOverlay({ overlay, friend, step, report, receipt, agentSource, reviewing, installedSkills, balance, onInstall, onReview, onVersion, onClose }: { overlay: Overlay; friend: ReturnType<typeof createFriendIdentity>; step: number; report: ResearchReport; receipt: MissionRecord | null; agentSource: AgentSource; reviewing: boolean; installedSkills: string[]; balance: number; onInstall: (skillId: string) => boolean; onReview: (action: ReviewAction, instruction: string, usedNativeFallback: boolean) => void; onVersion: (report: ResearchReport) => void; onClose: () => void }) { return <AnimatePresence>{overlay !== 'none' && <motion.div className="overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><motion.section initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}>{overlay === 'working' ? <><button className="overlay-close" onClick={onClose}>×</button><div className="working-avatar"><OperatorAvatar friend={friend} /><span /></div><p className="micro">MISSION IN PROGRESS</p><h2>{friend.name} is on it<em>.</em></h2><div className="steps">{executionSteps.map((item, index) => <p key={item} className={index < step ? 'done' : index === step ? 'active' : ''}><span>{index < step ? '✓' : index === step ? '●' : '○'}</span>{item}</p>)}</div></> : <><button className="overlay-close" onClick={onClose}>×</button><p className="micro">{receipt?.receiptId} / COMPLETE</p><h2>Here’s what {friend.name} found<em>.</em></h2><div className="report"><article><h3>Executive summary</h3><p>{report.summary}</p><ReportList title="Key findings" items={report.findings} /><ReportList title="Opportunities" items={report.opportunities} /><ReportList title="Next actions" items={report.nextActions} /></article><aside><strong>MISSION RECEIPT</strong><dl><div><dt>RF spent</dt><dd>{receipt?.rfSpent} RF</dd></div><div><dt>RF burned</dt><dd>{receipt?.rfBurned} RF</dd></div><div><dt>Compute</dt><dd>{receipt?.computeAllocation} RF</dd></div><div><dt>{receipt?.developerAllocation ? 'Skill creator' : 'Ecosystem'}</dt><dd>{receipt?.developerAllocation || receipt?.ecosystemAllocation} RF</dd></div><div><dt>Skill used</dt><dd>{receipt?.skillName}</dd></div><div><dt>XP / CRED</dt><dd>+{receipt?.xpEarned} / +{receipt?.credEarned}</dd></div></dl><small>{receipt?.developerAllocation ? `${receipt.skillDeveloper} EARNS ${receipt.developerAllocation} RF · ` : ''}{agentSource === 'openai' ? 'AI REPORT' : 'OFFLINE REPORT'}</small></aside></div><MissionReviewPanel receipt={receipt} friendName={friend.name} reviewing={reviewing} installedSkills={installedSkills} balance={balance} onInstall={onInstall} onReview={onReview} onVersion={onVersion} /><button className="done-button" onClick={onClose}>Return to workspace ↗</button></>}</motion.section></motion.div>}</AnimatePresence> }
-function MissionReviewPanel({ receipt, friendName, reviewing, installedSkills, balance, onInstall, onReview, onVersion }: { receipt: MissionRecord | null; friendName: string; reviewing: boolean; installedSkills: string[]; balance: number; onInstall: (skillId: string) => boolean; onReview: (action: ReviewAction, instruction: string, usedNativeFallback: boolean) => void; onVersion: (report: ResearchReport) => void }) {
-  const [action, setAction] = useState<ReviewAction>('clarify')
-  const [instruction, setInstruction] = useState('')
-  const [nativeApproved, setNativeApproved] = useState(false)
-  const reviews = receipt?.reviews ?? []
-  const limitReached = reviews.length >= 3
-  if (!receipt) return null
-  const routedSkillId = reviewSkillId(action, receipt.skillId)
-  const routedSkill = skillCatalog.find((skill) => skill.id === routedSkillId)
-  const specialistInstalled = installedSkills.includes(routedSkillId)
-  const ready = specialistInstalled || nativeApproved
-  const latest = reviews.at(-1)
-  const selectAction = (next: ReviewAction) => { setAction(next); setNativeApproved(false) }
-  return <section className="mission-review"><header><div><small>MISSION REVIEW · {reviews.length}/3 ROUNDS</small><h3>What should {friendName} do next?</h3></div><div className="version-tabs">{receipt.report && <button onClick={() => onVersion(receipt.report!)}>V1 · ORIGINAL</button>}{reviews.map((review) => <button key={review.id} onClick={() => onVersion(review.result)}>V{review.version} · {review.action.toUpperCase()}</button>)}</div></header>{latest && <div className="review-receipt"><strong>V{latest.version} REVIEW RECEIPT</strong><span>{latest.rfSpent} RF SPENT</span><span>{latest.rfBurned ?? 0} RF BURNED</span><span>{latest.computeAllocation ?? 0} RF COMPUTE</span><span>{latest.developerAllocation ? `${latest.developerAllocation} RF CREATOR` : `${latest.ecosystemAllocation ?? 0} RF ECOSYSTEM`}</span><span>{latest.skillName ?? receipt.skillName}</span><span>+{latest.masteryEarned} MASTERY</span><b>{latest.confidence === 'specialist' ? 'SPECIALIST CONFIDENCE' : 'NATIVE CONFIDENCE'}</b></div>}{limitReached ? <div className="review-limit"><strong>Review cycle complete.</strong><p>Accept the strongest version or begin a new linked mission from this work.</p></div> : <><div className="review-actions"><button className={action === 'clarify' ? 'active' : ''} onClick={() => selectAction('clarify')}><strong>Clarify</strong><span>Explain a claim or assumption.</span><b>FREE</b></button><button className={action === 'challenge' ? 'active' : ''} onClick={() => selectAction('challenge')}><strong>Challenge</strong><span>Test the result against its strongest alternative.</span><b>1 RF</b></button><button className={action === 'refine' ? 'active' : ''} onClick={() => selectAction('refine')}><strong>Refine</strong><span>Produce a revised deliverable.</span><b>2 RF</b></button></div>{!specialistInstalled && routedSkill && <div className="skill-route"><div><small>RECOMMENDED SPECIALIST</small><strong>{routedSkill.name}</strong><p>This review is stronger with {routedSkill.name}. Install it for full mastery and specialist confidence, or authorize native ability with reduced confidence.</p></div><button disabled={balance < routedSkill.price} onClick={() => onInstall(routedSkill.id)}>INSTALL · {routedSkill.price} RF</button><button className={nativeApproved ? 'selected' : ''} onClick={() => setNativeApproved(true)}>USE NATIVE ABILITY</button></div>}<label>GIVE {friendName.toUpperCase()} A FOLLOW-UP INSTRUCTION<textarea aria-label="Follow-up instruction" maxLength={300} value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder={action === 'clarify' ? 'Explain why this recommendation is the strongest…' : action === 'challenge' ? 'Test this against the strongest counterargument…' : 'Rewrite this for NFT collectors…'} /></label><footer><span>USES {specialistInstalled ? routedSkill?.name.toUpperCase() : 'NATIVE ABILITY'} · {reviewCost(action) ? `${reviewCost(action)} RF` : 'NO CHARGE'} · +{specialistInstalled ? action === 'clarify' ? 5 : 10 : 4} MASTERY</span><button disabled={reviewing || !ready || instruction.trim().length < 3} onClick={() => { onReview(action, instruction, !specialistInstalled); setInstruction(''); setNativeApproved(false) }}>{reviewing ? `${friendName} IS REVIEWING…` : `SEND BACK TO ${friendName.toUpperCase()} ↗`}</button></footer></>}</section>
+function Spark() {
+  return (
+    <i className="spark" aria-hidden="true">
+      ✦
+    </i>
+  );
 }
-function ReportList({ title, items }: { title: string; items: string[] }) { return <section><h3>{title}</h3><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></section> }
+function OperatorAvatar({
+  friend,
+  compact = false,
+}: {
+  friend: ReturnType<typeof createFriendIdentity>;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`operator-avatar avatar-${friend.avatarIndex ?? Number(BigInt(friend.tokenId) % 3n)} ${compact ? "compact" : ""}`}
+      role="img"
+      aria-label={`${friend.name} operator avatar`}
+    />
+  );
+}
+function PixelFriend({
+  friend,
+  compact = false,
+}: {
+  friend: ReturnType<typeof createFriendIdentity>;
+  compact?: boolean;
+}) {
+  return <OperatorAvatar friend={friend} compact={compact} />;
+}
+function BootScreen({
+  friend,
+}: {
+  friend: ReturnType<typeof createFriendIdentity>;
+}) {
+  return (
+    <motion.div
+      className="boot-screen"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.04 }}
+      transition={{ duration: 0.35 }}
+    >
+      <OperatorAvatar friend={friend} />
+      <strong>
+        friend<span>OS</span>
+      </strong>
+      <p>BRINGING YOUR FRIEND ONLINE</p>
+      <i>
+        <b />
+      </i>
+    </motion.div>
+  );
+}
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+function EconomyCard({
+  label,
+  value,
+  note,
+  icon,
+}: {
+  label: string;
+  value: number;
+  note: string;
+  icon: string;
+}) {
+  return (
+    <article>
+      <span>{label}</span>
+      <i>{icon}</i>
+      <strong>
+        {value}
+        <small> RF</small>
+      </strong>
+      <p>{note}</p>
+    </article>
+  );
+}
+function MissionOverlay({
+  overlay,
+  friend,
+  step,
+  report,
+  receipt,
+  agentSource,
+  reviewing,
+  installedSkills,
+  balance,
+  onInstall,
+  onReview,
+  onVersion,
+  onAccept,
+  onContinue,
+  onClose,
+}: {
+  overlay: Overlay;
+  friend: ReturnType<typeof createFriendIdentity>;
+  step: number;
+  report: ResearchReport;
+  receipt: MissionRecord | null;
+  agentSource: AgentSource;
+  reviewing: boolean;
+  installedSkills: string[];
+  balance: number;
+  onInstall: (skillId: string) => boolean;
+  onReview: (
+    action: ReviewAction,
+    instruction: string,
+    usedNativeFallback: boolean,
+  ) => void;
+  onVersion: (report: ResearchReport) => void;
+  onAccept: (version: number, memories: MemoryType[]) => void;
+  onContinue: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {overlay !== "none" && (
+        <motion.div
+          className="overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.section
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+          >
+            {overlay === "working" ? (
+              <>
+                <button className="overlay-close" onClick={onClose}>
+                  ×
+                </button>
+                <div className="working-avatar">
+                  <OperatorAvatar friend={friend} />
+                  <span />
+                </div>
+                <p className="micro">MISSION IN PROGRESS</p>
+                <h2>
+                  {friend.name} is on it<em>.</em>
+                </h2>
+                <div className="steps">
+                  {executionSteps.map((item, index) => (
+                    <p
+                      key={item}
+                      className={
+                        index < step ? "done" : index === step ? "active" : ""
+                      }
+                    >
+                      <span>
+                        {index < step ? "✓" : index === step ? "●" : "○"}
+                      </span>
+                      {item}
+                    </p>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <button className="overlay-close" onClick={onClose}>
+                  ×
+                </button>
+                <p className="micro">{receipt?.receiptId} / COMPLETE</p>
+                <h2>
+                  Here’s what {friend.name} found<em>.</em>
+                </h2>
+                <div className="report">
+                  <article>
+                    <h3>Executive summary</h3>
+                    <p>{report.summary}</p>
+                    <ReportList title="Key findings" items={report.findings} />
+                    <ReportList
+                      title="Opportunities"
+                      items={report.opportunities}
+                    />
+                    <ReportList
+                      title="Next actions"
+                      items={report.nextActions}
+                    />
+                  </article>
+                  <aside>
+                    <strong>MISSION RECEIPT</strong>
+                    <dl>
+                      <div>
+                        <dt>RF spent</dt>
+                        <dd>{receipt?.rfSpent} RF</dd>
+                      </div>
+                      <div>
+                        <dt>RF burned</dt>
+                        <dd>{receipt?.rfBurned} RF</dd>
+                      </div>
+                      <div>
+                        <dt>Compute</dt>
+                        <dd>{receipt?.computeAllocation} RF</dd>
+                      </div>
+                      <div>
+                        <dt>
+                          {receipt?.developerAllocation
+                            ? "Skill creator"
+                            : "Ecosystem"}
+                        </dt>
+                        <dd>
+                          {receipt?.developerAllocation ||
+                            receipt?.ecosystemAllocation}{" "}
+                          RF
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Skill used</dt>
+                        <dd>{receipt?.skillName}</dd>
+                      </div>
+                      <div>
+                        <dt>XP / CRED</dt>
+                        <dd>
+                          +{receipt?.xpEarned} / +{receipt?.credEarned}
+                        </dd>
+                      </div>
+                    </dl>
+                    <small>
+                      {receipt?.developerAllocation
+                        ? `${receipt.skillDeveloper} EARNS ${receipt.developerAllocation} RF · `
+                        : ""}
+                      {agentSource === "openai"
+                        ? "AI REPORT"
+                        : "OFFLINE REPORT"}
+                    </small>
+                  </aside>
+                </div>
+                <MissionReviewPanel
+                  receipt={receipt}
+                  friendName={friend.name}
+                  reviewing={reviewing}
+                  installedSkills={installedSkills}
+                  balance={balance}
+                  onInstall={onInstall}
+                  onReview={onReview}
+                  onVersion={onVersion}
+                  onAccept={onAccept}
+                  onContinue={onContinue}
+                />
+                <button className="done-button" onClick={onClose}>
+                  Return to workspace ↗
+                </button>
+              </>
+            )}
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+function MissionReviewPanel({
+  receipt,
+  friendName,
+  reviewing,
+  installedSkills,
+  balance,
+  onInstall,
+  onReview,
+  onVersion,
+  onAccept,
+  onContinue,
+}: {
+  receipt: MissionRecord | null;
+  friendName: string;
+  reviewing: boolean;
+  installedSkills: string[];
+  balance: number;
+  onInstall: (skillId: string) => boolean;
+  onReview: (
+    action: ReviewAction,
+    instruction: string,
+    usedNativeFallback: boolean,
+  ) => void;
+  onVersion: (report: ResearchReport) => void;
+  onAccept: (version: number, memories: MemoryType[]) => void;
+  onContinue: () => void;
+}) {
+  const [action, setAction] = useState<ReviewAction>("clarify");
+  const [instruction, setInstruction] = useState("");
+  const [nativeApproved, setNativeApproved] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState(receipt?.acceptedVersion ?? (receipt?.reviews?.length ?? 0) + 1);
+  const [memoryTypes, setMemoryTypes] = useState<MemoryType[]>(["conclusion", "workflow"]);
+  const reviews = receipt?.reviews ?? [];
+  const limitReached = reviews.length >= 3;
+  if (!receipt) return null;
+  const routedSkillId = reviewSkillId(action, receipt.skillId);
+  const routedSkill = skillCatalog.find((skill) => skill.id === routedSkillId);
+  const specialistInstalled = installedSkills.includes(routedSkillId);
+  const ready = specialistInstalled || nativeApproved;
+  const latest = reviews.at(-1);
+  const selectAction = (next: ReviewAction) => {
+    setAction(next);
+    setNativeApproved(false);
+  };
+  return (
+    <section className="mission-review">
+      <header>
+        <div>
+          <small>MISSION REVIEW · {reviews.length}/3 ROUNDS</small>
+          <h3>What should {friendName} do next?</h3>
+        </div>
+        <div className="version-tabs">
+          {receipt.report && (
+            <button className={selectedVersion === 1 ? "active" : ""} onClick={() => { setSelectedVersion(1); onVersion(receipt.report!); }}>
+              V1 · ORIGINAL
+            </button>
+          )}
+          {reviews.map((review) => (
+            <button className={selectedVersion === review.version ? "active" : ""} key={review.id} onClick={() => { setSelectedVersion(review.version); onVersion(review.result); }}>
+              V{review.version} · {review.action.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </header>
+      {latest && (
+        <div className="review-receipt">
+          <strong>V{latest.version} REVIEW RECEIPT</strong>
+          <span>{latest.rfSpent} RF SPENT</span>
+          <span>{latest.rfBurned ?? 0} RF BURNED</span>
+          <span>{latest.computeAllocation ?? 0} RF COMPUTE</span>
+          <span>
+            {latest.developerAllocation
+              ? `${latest.developerAllocation} RF CREATOR`
+              : `${latest.ecosystemAllocation ?? 0} RF ECOSYSTEM`}
+          </span>
+          <span>{latest.skillName ?? receipt.skillName}</span>
+          <span>+{latest.masteryEarned} MASTERY</span>
+          <b>
+            {latest.confidence === "specialist"
+              ? "SPECIALIST CONFIDENCE"
+              : "NATIVE CONFIDENCE"}
+          </b>
+        </div>
+      )}
+      {limitReached ? (
+        <div className="review-limit">
+          <strong>Review cycle complete.</strong>
+          <p>
+            Accept the strongest version or begin a new linked mission from this
+            work.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="review-actions">
+            <button
+              className={action === "clarify" ? "active" : ""}
+              onClick={() => selectAction("clarify")}
+            >
+              <strong>Clarify</strong>
+              <span>Explain a claim or assumption.</span>
+              <b>FREE</b>
+            </button>
+            <button
+              className={action === "challenge" ? "active" : ""}
+              onClick={() => selectAction("challenge")}
+            >
+              <strong>Challenge</strong>
+              <span>Test the result against its strongest alternative.</span>
+              <b>1 RF</b>
+            </button>
+            <button
+              className={action === "refine" ? "active" : ""}
+              onClick={() => selectAction("refine")}
+            >
+              <strong>Refine</strong>
+              <span>Produce a revised deliverable.</span>
+              <b>2 RF</b>
+            </button>
+          </div>
+          {!specialistInstalled && routedSkill && (
+            <div className="skill-route">
+              <div>
+                <small>RECOMMENDED SPECIALIST</small>
+                <strong>{routedSkill.name}</strong>
+                <p>
+                  This review is stronger with {routedSkill.name}. Install it
+                  for full mastery and specialist confidence, or authorize
+                  native ability with reduced confidence.
+                </p>
+              </div>
+              <button
+                disabled={balance < routedSkill.price}
+                onClick={() => onInstall(routedSkill.id)}
+              >
+                INSTALL · {routedSkill.price} RF
+              </button>
+              <button
+                className={nativeApproved ? "selected" : ""}
+                onClick={() => setNativeApproved(true)}
+              >
+                USE NATIVE ABILITY
+              </button>
+            </div>
+          )}
+          <label>
+            GIVE {friendName.toUpperCase()} A FOLLOW-UP INSTRUCTION
+            <textarea
+              aria-label="Follow-up instruction"
+              maxLength={300}
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              placeholder={
+                action === "clarify"
+                  ? "Explain why this recommendation is the strongest…"
+                  : action === "challenge"
+                    ? "Test this against the strongest counterargument…"
+                    : "Rewrite this for NFT collectors…"
+              }
+            />
+          </label>
+          <footer>
+            <span>
+              USES{" "}
+              {specialistInstalled
+                ? routedSkill?.name.toUpperCase()
+                : "NATIVE ABILITY"}{" "}
+              · {reviewCost(action) ? `${reviewCost(action)} RF` : "NO CHARGE"}{" "}
+              · +{specialistInstalled ? (action === "clarify" ? 5 : 10) : 4}{" "}
+              MASTERY
+            </span>
+            <button
+              disabled={reviewing || !ready || instruction.trim().length < 3}
+              onClick={() => {
+                onReview(action, instruction, !specialistInstalled);
+                setInstruction("");
+                setNativeApproved(false);
+              }}
+            >
+              {reviewing
+                ? `${friendName} IS REVIEWING…`
+                : `SEND BACK TO ${friendName.toUpperCase()} ↗`}
+            </button>
+          </footer>
+        </>
+      )}
+      <section className="mission-finalize">
+        <div><small>FINALIZE THIS WORK</small><h4>{receipt.status === "accepted" ? `Accepted as V${receipt.acceptedVersion}` : `Accept V${selectedVersion} as the final result`}</h4><p>Choose what this operator should remember. Nothing is saved unless you select it.</p></div>
+        <div className="memory-choices">
+          {([['conclusion', 'Final conclusion'], ['preference', 'Your preference'], ['rejected-direction', 'Rejected direction'], ['workflow', 'Reusable workflow']] as [MemoryType, string][]).map(([type, label]) => <label key={type}><input type="checkbox" checked={memoryTypes.includes(type)} onChange={() => setMemoryTypes((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type])} />{label}</label>)}
+        </div>
+        <footer><button onClick={() => onAccept(selectedVersion, memoryTypes)}>{receipt.status === "accepted" ? `UPDATE ACCEPTED V${selectedVersion}` : `ACCEPT V${selectedVersion} ↗`}</button><button className="linked-mission" onClick={onContinue}>START LINKED MISSION ↗</button></footer>
+      </section>
+    </section>
+  );
+}
+function ReportList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section>
+      <h3>{title}</h3>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}

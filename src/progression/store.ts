@@ -44,8 +44,13 @@ export interface MissionRecord {
   report?: ResearchReport
   reviews?: MissionReview[]
   acceptedVersion?: number
-  status?: 'in-review' | 'accepted'
+  status?: 'in-review' | 'accepted' | 'continued'
+  parentReceiptId?: string
+  linkedMissionId?: string
 }
+
+export type MemoryType = 'conclusion' | 'preference' | 'rejected-direction' | 'workflow'
+export interface OperatorMemory { id: string; type: MemoryType; content: string; sourceReceiptId: string; createdAt: string }
 
 export interface WalletTransaction {
   id: string
@@ -69,12 +74,14 @@ export interface FriendProgress {
   perMissionLimit: number
   autoApprove: boolean
   transactions: WalletTransaction[]
+  memories: OperatorMemory[]
 }
 
 interface ProgressionState {
   friends: Record<string, FriendProgress>
-  completeMission: (friendId: string, request: string, missionId?: string, report?: ResearchReport) => MissionRecord
+  completeMission: (friendId: string, request: string, missionId?: string, report?: ResearchReport, parentReceiptId?: string) => MissionRecord
   completeReview: (friendId: string, receiptId: string, action: ReviewAction, instruction: string, result: ResearchReport, usedNativeFallback?: boolean) => MissionReview | null
+  acceptMissionVersion: (friendId: string, receiptId: string, version: number, memoryTypes: MemoryType[]) => boolean
   resetFriend: (friendId: string) => void
   installSkill: (friendId: string, skillId: string, price: number) => boolean
   fundWallet: (friendId: string, amount: number) => boolean
@@ -95,6 +102,7 @@ export const initialProgress = (): FriendProgress => ({
   perMissionLimit: 10,
   autoApprove: true,
   transactions: [],
+  memories: [],
 })
 
 function createReceiptId(friendId: string, count: number) {
@@ -109,7 +117,7 @@ export const useProgressionStore = create<ProgressionState>()(
   persist(
     (set, get) => ({
       friends: {},
-      completeMission: (friendId, request, missionId = 'research', report) => {
+      completeMission: (friendId, request, missionId = 'research', report, parentReceiptId) => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         const mission = missions.find((item) => item.id === missionId) ?? missions[2]
         const skill = skillCatalog.find((item) => item.id === mission.skillId)
@@ -140,6 +148,7 @@ export const useProgressionStore = create<ProgressionState>()(
           report,
           reviews: [],
           status: 'in-review',
+          parentReceiptId,
         }
 
         set((state) => ({
@@ -152,13 +161,14 @@ export const useProgressionStore = create<ProgressionState>()(
               missionCount: nextCount,
               rfSpent: current.rfSpent + record.rfSpent,
               rfBurned: current.rfBurned + record.rfBurned,
-              history: [record, ...current.history],
+              history: [record, ...current.history.map((item) => item.receiptId === parentReceiptId ? { ...item, status: 'continued' as const, linkedMissionId: record.receiptId } : item)],
               installedSkills: current.installedSkills ?? ['deep-research'],
               skillMastery: { ...(current.skillMastery ?? {}), [mission.skillId]: (current.skillMastery?.[mission.skillId] ?? 0) + (current.installedSkills.includes(mission.skillId) ? 25 : 8) },
               dailyLimit: current.dailyLimit ?? 25,
               perMissionLimit: current.perMissionLimit ?? 10,
               autoApprove: current.autoApprove ?? true,
               transactions: [{ id: record.receiptId, type: 'mission', label: record.missionName, amount: -record.rfSpent, createdAt: record.completedAt }, ...(current.transactions ?? [])],
+              memories: current.memories ?? [],
             },
           },
         }))
@@ -191,6 +201,26 @@ export const useProgressionStore = create<ProgressionState>()(
           transactions: rfSpent ? [{ id: review.id, type: 'review', label: `${mission.missionName} · ${action}`, amount: -rfSpent, createdAt: review.completedAt }, ...current.transactions] : current.transactions,
         } } }))
         return review
+      },
+      acceptMissionVersion: (friendId, receiptId, version, memoryTypes) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        const mission = current.history.find((item) => item.receiptId === receiptId)
+        if (!mission) return false
+        const selected = version === 1 ? mission.report : mission.reviews?.find((item) => item.version === version)?.result
+        if (!selected) return false
+        const now = new Date().toISOString()
+        const content: Record<MemoryType, string> = {
+          conclusion: selected.summary,
+          preference: `Preferred direction: ${mission.reviews?.find((item) => item.version === version)?.instruction || mission.request}`,
+          'rejected-direction': selected.findings[0],
+          workflow: `${mission.missionName}: ${selected.nextActions.join(' · ')}`,
+        }
+        const additions = memoryTypes.map((type) => ({ id: `${receiptId}-V${version}-${type}`, type, content: content[type], sourceReceiptId: receiptId, createdAt: now }))
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current,
+          history: current.history.map((item) => item.receiptId === receiptId ? { ...item, acceptedVersion: version, status: 'accepted' as const } : item),
+          memories: [...additions.filter((entry) => !(current.memories ?? []).some((saved) => saved.id === entry.id)), ...(current.memories ?? [])],
+        } } }))
+        return true
       },
       resetFriend: (friendId) => set((state) => {
         const friends = { ...state.friends }

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createDemoReport, type ResearchReport } from '../missions/demoAgent'
+import { createDemoReport, createReviewReport, type ResearchReport, type ReviewAction } from '../missions/demoAgent'
 import type { FriendIdentity } from '../friend/types'
 
 const reportSchema = z.object({
@@ -14,6 +14,10 @@ export type AgentSource = 'openai' | 'fallback'
 export interface MissionSkillContext {
   installedSkills: string[]
   skillMastery: Record<string, number>
+}
+
+export async function executeMissionReview(action: ReviewAction, instruction: string, previousReport: ResearchReport): Promise<{ report: ResearchReport; source: AgentSource }> {
+  return { report: createReviewReport(action, instruction, previousReport), source: 'fallback' }
 }
 
 export async function executeResearchMission(request: string, friend: FriendIdentity, missionId = 'research', skills?: MissionSkillContext): Promise<{ report: ResearchReport; source: AgentSource }> {
