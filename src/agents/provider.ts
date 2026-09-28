@@ -11,7 +11,12 @@ const reportSchema = z.object({
 
 export type AgentSource = 'openai' | 'fallback'
 
-export async function executeResearchMission(request: string, friend: FriendIdentity, missionId = 'research'): Promise<{ report: ResearchReport; source: AgentSource }> {
+export interface MissionSkillContext {
+  installedSkills: string[]
+  skillMastery: Record<string, number>
+}
+
+export async function executeResearchMission(request: string, friend: FriendIdentity, missionId = 'research', skills?: MissionSkillContext): Promise<{ report: ResearchReport; source: AgentSource }> {
   try {
     const response = await fetch('/api/mission', {
       method: 'POST',
@@ -20,8 +25,9 @@ export async function executeResearchMission(request: string, friend: FriendIden
         request,
         missionId,
         friend: { name: friend.name, archetype: friend.archetype, traits: friend.traits, primarySkill: friend.primarySkill },
+        skills,
       }),
-      signal: AbortSignal.timeout(6_000),
+      signal: AbortSignal.timeout(20_000),
     })
     if (!response.ok) throw new Error(`Agent endpoint returned ${response.status}`)
     const payload = await response.json() as { report?: unknown; source?: unknown }

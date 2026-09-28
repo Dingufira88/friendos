@@ -73,7 +73,7 @@ export function App() {
   function launchMission() {
     if (!canLaunch) return
     setStep(0); setAgentReady(false); setReceipt(null); setOverlay('working')
-    void executeResearchMission(request, friend, selectedMission).then((result) => {
+    void executeResearchMission(request, friend, selectedMission, { installedSkills: progress.installedSkills, skillMastery: progress.skillMastery }).then((result) => {
       setReport(result.report); setAgentSource(result.source); setAgentReady(true)
     })
   }
