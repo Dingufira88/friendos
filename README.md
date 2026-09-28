@@ -148,7 +148,7 @@ To enable live AI on a serverless host, copy `.env.example`, set `OPENAI_API_KEY
 
 ## Deployment
 
-Every push to `main` runs the production build and sixteen desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
+Every push to `main` runs the production build and eighteen desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
 
 ## Known limitations
 

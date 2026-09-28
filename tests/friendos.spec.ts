@@ -7,6 +7,22 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('button', { name: 'Explore first' }).click()
 })
 
+test('separates the first-visit tour from optional wallet connection', async ({ page }) => {
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  const tour = page.locator('.onboarding')
+  await expect(tour.getByRole('heading', { name: 'Your Rare Friend, now at work.' })).toBeVisible()
+  await expect(tour.getByText(/wallet is not required/i)).toBeVisible()
+  await expect(tour.getByRole('button', { name: /Connect wallet/i })).toHaveCount(0)
+  await tour.getByRole('button', { name: 'Explore first' }).click()
+  await expect(page.getByText('Connect and sign to load up to three operators and your spendable RF balance.')).toHaveCount(0)
+  await page.locator('.top-actions').getByRole('button', { name: /Connect wallet/ }).click()
+  const walletModal = page.locator('.wallet-connect-modal')
+  await expect(walletModal.getByText('OPTIONAL WALLET CONNECTION')).toBeVisible()
+  await expect(walletModal.getByText(/do not need a wallet/i)).toBeVisible()
+  await expect(walletModal.getByText(/missions, skills, RF spending, burns, rewards, and progression/i)).toBeVisible()
+})
+
 test('completes a Research Mission from the unified workspace', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'Your Rare Friend, your new operator.' })).toBeVisible()
   await page.getByLabel('Tell your Friend what you need').fill('Explain the strongest opportunities for Rare Friends builders.')

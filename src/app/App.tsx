@@ -49,6 +49,7 @@ export function App() {
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem("friendos-onboarded") !== "yes",
   );
+  const [showWalletConnect, setShowWalletConnect] = useState(false);
   const [showAgentSkills, setShowAgentSkills] = useState(false);
   const [showCapabilities, setShowCapabilities] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
@@ -303,7 +304,9 @@ export function App() {
             onClick={
               wallet.status === "wrong-network"
                 ? wallet.switchNetwork
-                : wallet.connect
+                : wallet.account
+                  ? () => setShowWalletConnect(true)
+                  : () => setShowWalletConnect(true)
             }
           >
             {wallet.connecting
@@ -315,10 +318,7 @@ export function App() {
         </div>
       </header>
       <main>
-        <WalletSessionCard
-          wallet={wallet}
-          onGuide={() => setShowOnboarding(true)}
-        />
+        <WalletSessionCard wallet={wallet} />
         <button
           className="agent-skills-open"
           onClick={() => setShowAgentSkills(true)}
@@ -948,12 +948,14 @@ export function App() {
       </AnimatePresence>
       {showOnboarding && (
         <Onboarding
-          wallet={wallet}
           onClose={() => {
             localStorage.setItem("friendos-onboarded", "yes");
             setShowOnboarding(false);
           }}
         />
+      )}
+      {showWalletConnect && (
+        <WalletConnectModal wallet={wallet} onClose={() => setShowWalletConnect(false)} />
       )}
       <dialog id="skill-spec" className="skill-dialog">
         <button
@@ -1175,15 +1177,13 @@ function AgentProfilePage({
 
 function WalletSessionCard({
   wallet,
-  onGuide,
 }: {
   wallet: ReturnType<typeof useWallet>;
-  onGuide: () => void;
 }) {
+  if (!wallet.account) return null;
   return (
     <section className="wallet-session">
-      {wallet.account ? (
-        <>
+      <>
           <div>
             <span>CONNECTED WALLET</span>
             <strong>
@@ -1205,93 +1205,63 @@ function WalletSessionCard({
             <button onClick={wallet.signIn}>Sign to verify ↗</button>
           )}
           <button onClick={wallet.disconnect}>Disconnect</button>
-        </>
-      ) : (
-        <>
-          <p>
-            Connect and sign to load up to three operators and your spendable RF
-            balance.
-          </p>
-          <button onClick={onGuide}>Start setup ↗</button>
-        </>
-      )}
+      </>
     </section>
   );
 }
 
 function Onboarding({
-  wallet,
   onClose,
 }: {
-  wallet: ReturnType<typeof useWallet>;
   onClose: () => void;
 }) {
-  const step = !wallet.account ? 1 : !wallet.signedIn ? 2 : 3;
   return (
     <div className="onboarding">
       <section>
         <span>WELCOME TO FRIENDOS</span>
-        <h2>Bring your operators online.</h2>
+        <h2>Your Rare Friend, now at work.</h2>
         <p>
-          We’ll verify your wallet, discover up to three Rare Friends, and read
-          the RF balance they can use. Signing is free and does not create a
-          transaction.
+          Explore with three ready-to-use operators. A wallet is not required:
+          missions, skills, progression, reviews, and RF activity are available
+          in guest mode, and economic actions are simulated.
         </p>
         <ol>
-          <li className={step >= 1 ? "active" : ""}>
+          <li className="active">
             <b>01</b>
             <div>
-              <strong>Connect wallet</strong>
-              <small>Choose an injected wallet on Robinhood Chain.</small>
+              <strong>Meet your operator</strong>
+              <small>Switch Friends and inspect what each one can do.</small>
             </div>
-            {wallet.account ? (
-              "✓"
-            ) : (
-              <button onClick={wallet.connect}>Connect</button>
-            )}
+            <span>✦</span>
           </li>
-          <li className={step >= 2 ? "active" : ""}>
+          <li className="active">
             <b>02</b>
             <div>
-              <strong>Sign in</strong>
-              <small>
-                Prove this session belongs to you. No gas or spending.
-              </small>
+              <strong>Launch useful work</strong>
+              <small>Give a mission, follow its progress, and review the result.</small>
             </div>
-            {wallet.signedIn ? (
-              "✓"
-            ) : (
-              <button disabled={!wallet.account} onClick={wallet.signIn}>
-                Sign message
-              </button>
-            )}
+            <span>✦</span>
           </li>
-          <li className={step >= 3 ? "active" : ""}>
+          <li className="active">
             <b>03</b>
             <div>
-              <strong>Load operators + RF</strong>
-              <small>
-                {wallet.loadingFriends
-                  ? "Reading onchain data…"
-                  : `${wallet.ownedFriends.length} operators found · ${wallet.rfBalance} RF`}
-              </small>
+              <strong>Grow through action</strong>
+              <small>Install skills, earn mastery, and choose what your Friend remembers.</small>
             </div>
-            {wallet.signedIn ? "✓" : "○"}
+            <span>✦</span>
           </li>
         </ol>
-        <button
-          className="finish-setup"
-          disabled={!wallet.signedIn}
-          onClick={onClose}
-        >
-          Enter FriendOS ↗
-        </button>
-        <button className="skip-setup" onClick={onClose}>
+        <button className="finish-setup" onClick={onClose}>
           Explore first
         </button>
       </section>
     </div>
   );
+}
+
+function WalletConnectModal({ wallet, onClose }: { wallet: ReturnType<typeof useWallet>; onClose: () => void }) {
+  const step = !wallet.account ? 1 : !wallet.signedIn ? 2 : 3;
+  return <div className="onboarding wallet-connect-modal"><section><button className="modal-close" onClick={onClose}>×</button><span>OPTIONAL WALLET CONNECTION</span><h2>Bring your own Friends online.</h2><p>You do not need a wallet to use FriendOS right now. Most actions—including missions, skills, RF spending, burns, rewards, and progression—are simulated so you can explore the complete experience safely.</p><div className="wallet-note"><strong>WHAT CONNECTING ADDS</strong><p>Discover up to three owned Generations NFTs, load their canonical on-chain identity, and display your real $RAREFRIENDS holding as read-only data.</p></div><ol><li className={step >= 1 ? "active" : ""}><b>01</b><div><strong>Connect wallet</strong><small>Choose an injected wallet and switch to Robinhood Chain if requested.</small></div>{wallet.account ? "✓" : <button disabled={wallet.connecting} onClick={wallet.connect}>{wallet.connecting ? "Connecting…" : "Connect"}</button>}</li><li className={step >= 2 ? "active" : ""}><b>02</b><div><strong>Sign to verify</strong><small>A free message signature proves this session is yours. It uses no gas and spends no RF.</small></div>{wallet.signedIn ? "✓" : <button disabled={!wallet.account} onClick={wallet.signIn}>Sign message</button>}</li><li className={step >= 3 ? "active" : ""}><b>03</b><div><strong>Load operators + RF</strong><small>{wallet.loadingFriends ? "Reading on-chain data…" : wallet.signedIn ? `${wallet.ownedFriends.length} operators found · ${wallet.rfBalance} RF` : "Available after verification"}</small></div>{wallet.signedIn ? "✓" : "○"}</li></ol><button className="finish-setup" onClick={wallet.signedIn ? onClose : wallet.account ? wallet.signIn : wallet.connect}>{wallet.signedIn ? "Continue with my Friends ↗" : wallet.account ? "Sign message ↗" : "Connect wallet ↗"}</button><button className="skip-setup" onClick={onClose}>Keep exploring without a wallet</button></section></div>;
 }
 
 function TrainingLab() {
