@@ -12,6 +12,7 @@ export interface FriendToken {
   walletAddress?: string
   familyName?: string
   spriteRows?: readonly string[]
+  avatarIndex?: number
 }
 
 export interface FriendIdentity extends FriendToken {

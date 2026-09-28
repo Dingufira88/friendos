@@ -8,6 +8,7 @@ export const demoFriends: FriendToken[] = [
     name: 'Signal',
     color: '#69f7d9',
     glyph: 'S',
+    avatarIndex: 0,
   },
   {
     collection: 'Rare Friends Generations',
@@ -16,6 +17,7 @@ export const demoFriends: FriendToken[] = [
     name: 'Nova',
     color: '#ffbb55',
     glyph: 'N',
+    avatarIndex: 1,
   },
   {
     collection: 'Rare Friends Generations',
@@ -24,5 +26,6 @@ export const demoFriends: FriendToken[] = [
     name: 'Patch',
     color: '#b48cff',
     glyph: 'P',
+    avatarIndex: 2,
   },
 ]

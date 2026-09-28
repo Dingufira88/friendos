@@ -4,6 +4,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
+  await page.getByRole('button', { name: 'Explore first' }).click()
 })
 
 test('completes a Research Mission from the unified workspace', async ({ page }, testInfo) => {
@@ -42,4 +43,18 @@ test('opens Skills marketplace and manages an operator wallet', async ({ page })
   await page.getByRole('button', { name: /Back to workspace/ }).click()
   await page.getByLabel('Tell your Friend what you need').fill('Research Rare Friends')
   await expect(page.getByRole('button', { name: /Launch mission/ })).toBeDisabled()
+})
+
+test('confirms which operator receives a skill and trains a skill NFT', async ({ page }) => {
+  await page.getByRole('button', { name: 'Skills' }).click()
+  await page.getByRole('button', { name: /INSTALL · 12 RF/ }).click()
+  await expect(page.getByRole('heading', { name: /Who will learn Social Signal/ })).toBeVisible()
+  await expect(page.locator('.agent-purchase-list label')).toHaveCount(3)
+  await page.locator('.agent-purchase-list label').nth(1).click()
+  await page.getByRole('button', { name: /Confirm and install/ }).click()
+  await page.getByPlaceholder('e.g. Chain Scout').fill('Chain Scout')
+  await page.getByRole('button', { name: /Mint free training NFT/ }).click()
+  await expect(page.getByText('Approval request')).toBeVisible()
+  await page.getByRole('button', { name: 'Approve with caution' }).click()
+  await expect(page.getByText(/Judgment XP \+25/)).toBeVisible()
 })
