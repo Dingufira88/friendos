@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { missions } from '../missions/definitions'
 import { skillCatalog } from '../skills/catalog'
 import type { ResearchReport, ReviewAction } from '../missions/demoAgent'
+import { reviewCost, reviewSkillId } from '../missions/reviewRouting'
 
 export interface MissionReview {
   id: string
@@ -14,6 +15,14 @@ export interface MissionReview {
   skillId: string
   masteryEarned: number
   completedAt: string
+  skillName: string
+  skillDeveloper: string
+  usedNativeFallback: boolean
+  confidence: 'specialist' | 'native'
+  rfBurned: number
+  computeAllocation: number
+  ecosystemAllocation: number
+  developerAllocation: number
 }
 
 export interface MissionRecord {
@@ -65,7 +74,7 @@ export interface FriendProgress {
 interface ProgressionState {
   friends: Record<string, FriendProgress>
   completeMission: (friendId: string, request: string, missionId?: string, report?: ResearchReport) => MissionRecord
-  completeReview: (friendId: string, receiptId: string, action: ReviewAction, instruction: string, result: ResearchReport) => MissionReview | null
+  completeReview: (friendId: string, receiptId: string, action: ReviewAction, instruction: string, result: ResearchReport, usedNativeFallback?: boolean) => MissionReview | null
   resetFriend: (friendId: string) => void
   installSkill: (friendId: string, skillId: string, price: number) => boolean
   fundWallet: (friendId: string, amount: number) => boolean
@@ -156,20 +165,28 @@ export const useProgressionStore = create<ProgressionState>()(
 
         return record
       },
-      completeReview: (friendId, receiptId, action, instruction, result) => {
+      completeReview: (friendId, receiptId, action, instruction, result, usedNativeFallback = false) => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         const mission = current.history.find((item) => item.receiptId === receiptId)
         const reviews = mission?.reviews ?? []
         if (!mission || reviews.length >= 3) return null
-        const rfSpent = action === 'clarify' ? 0 : action === 'challenge' ? 1 : 2
+        const rfSpent = reviewCost(action)
         if (current.balance < rfSpent) return null
-        const review: MissionReview = { id: `${receiptId}-R${reviews.length + 1}`, action, instruction, result, version: reviews.length + 2, rfSpent, skillId: mission.skillId, masteryEarned: action === 'clarify' ? 5 : 10, completedAt: new Date().toISOString() }
+        const skillId = reviewSkillId(action, mission.skillId)
+        const skill = skillCatalog.find((item) => item.id === skillId)
+        const specialist = current.installedSkills.includes(skillId) && !usedNativeFallback
+        const developerAllocation = specialist && skill?.developerShare ? rfAmount(rfSpent * skill.developerShare / 100) : 0
+        const rfBurned = rfAmount(rfSpent * .5)
+        const computeAllocation = rfAmount(rfSpent * .3)
+        const ecosystemAllocation = rfAmount(rfSpent - rfBurned - computeAllocation - developerAllocation)
+        const review: MissionReview = { id: `${receiptId}-R${reviews.length + 1}`, action, instruction, result, version: reviews.length + 2, rfSpent, skillId, skillName: specialist ? skill?.name ?? mission.skillName : 'Native operator ability', skillDeveloper: developerAllocation ? skill?.developer ?? 'Community developer' : 'FriendOS ecosystem', usedNativeFallback: !specialist, confidence: specialist ? 'specialist' : 'native', masteryEarned: specialist ? (action === 'clarify' ? 5 : 10) : 4, rfBurned, computeAllocation, ecosystemAllocation, developerAllocation, completedAt: new Date().toISOString() }
         const updatedMission: MissionRecord = { ...mission, reviews: [...reviews, review], status: 'in-review' }
         set((state) => ({ friends: { ...state.friends, [friendId]: {
           ...current,
           balance: current.balance - rfSpent,
           rfSpent: current.rfSpent + rfSpent,
-          skillMastery: { ...current.skillMastery, [mission.skillId]: (current.skillMastery[mission.skillId] ?? 0) + review.masteryEarned },
+          rfBurned: current.rfBurned + review.rfBurned,
+          skillMastery: { ...current.skillMastery, [skillId]: (current.skillMastery[skillId] ?? 0) + review.masteryEarned },
           history: current.history.map((item) => item.receiptId === receiptId ? updatedMission : item),
           transactions: rfSpent ? [{ id: review.id, type: 'review', label: `${mission.missionName} · ${action}`, amount: -rfSpent, createdAt: review.completedAt }, ...current.transactions] : current.transactions,
         } } }))
