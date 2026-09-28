@@ -58,3 +58,15 @@ test('confirms which operator receives a skill and trains a skill NFT', async ({
   await page.getByRole('button', { name: 'Approve with caution' }).click()
   await expect(page.getByText(/Judgment XP \+25/)).toBeVisible()
 })
+
+test('runs distinct guest missions and opens acquired skill mastery', async ({ page }) => {
+  await page.getByRole('button', { name: /Social Content/ }).click()
+  await page.getByLabel('Tell your Friend what you need').fill('Announce a new onchain analytics skill')
+  await page.getByRole('button', { name: /Launch mission/ }).click()
+  await expect(page.getByText(/social campaign designed for clarity/)).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('button', { name: /Return to workspace/ }).click()
+  await page.getByRole('button', { name: 'Agent profile' }).click()
+  await page.getByRole('button', { name: /View all 1 acquired skills/ }).click()
+  await expect(page.getByRole('heading', { name: /Abilities that grow through work/ })).toBeVisible()
+  await expect(page.locator('.mastery-list small').filter({ hasText: 'MASTERY XP' })).toBeVisible()
+})

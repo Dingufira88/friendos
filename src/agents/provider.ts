@@ -11,13 +11,14 @@ const reportSchema = z.object({
 
 export type AgentSource = 'openai' | 'fallback'
 
-export async function executeResearchMission(request: string, friend: FriendIdentity): Promise<{ report: ResearchReport; source: AgentSource }> {
+export async function executeResearchMission(request: string, friend: FriendIdentity, missionId = 'research'): Promise<{ report: ResearchReport; source: AgentSource }> {
   try {
     const response = await fetch('/api/mission', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         request,
+        missionId,
         friend: { name: friend.name, archetype: friend.archetype, traits: friend.traits, primarySkill: friend.primarySkill },
       }),
     })
@@ -25,6 +26,6 @@ export async function executeResearchMission(request: string, friend: FriendIden
     const payload = await response.json() as { report?: unknown; source?: unknown }
     return { report: reportSchema.parse(payload.report), source: payload.source === 'openai' ? 'openai' : 'fallback' }
   } catch {
-    return { report: createDemoReport(request), source: 'fallback' }
+    return { report: createDemoReport(request, missionId), source: 'fallback' }
   }
 }

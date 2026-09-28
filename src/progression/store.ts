@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { missions } from '../missions/definitions'
 
 export interface MissionRecord {
   receiptId: string
@@ -32,6 +33,7 @@ export interface FriendProgress {
   rfBurned: number
   history: MissionRecord[]
   installedSkills: string[]
+  skillMastery: Record<string, number>
   dailyLimit: number
   perMissionLimit: number
   autoApprove: boolean
@@ -40,7 +42,7 @@ export interface FriendProgress {
 
 interface ProgressionState {
   friends: Record<string, FriendProgress>
-  completeMission: (friendId: string, request: string) => MissionRecord
+  completeMission: (friendId: string, request: string, missionId?: string) => MissionRecord
   resetFriend: (friendId: string) => void
   installSkill: (friendId: string, skillId: string, price: number) => boolean
   fundWallet: (friendId: string, amount: number) => boolean
@@ -56,6 +58,7 @@ export const initialProgress = (): FriendProgress => ({
   rfBurned: 0,
   history: [],
   installedSkills: ['deep-research'],
+  skillMastery: { 'deep-research': 20 },
   dailyLimit: 25,
   perMissionLimit: 10,
   autoApprove: true,
@@ -70,21 +73,22 @@ export const useProgressionStore = create<ProgressionState>()(
   persist(
     (set, get) => ({
       friends: {},
-      completeMission: (friendId, request) => {
-        const current = get().friends[friendId] ?? initialProgress()
+      completeMission: (friendId, request, missionId = 'research') => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        const mission = missions.find((item) => item.id === missionId) ?? missions[2]
         const nextCount = current.missionCount + 1
         const record: MissionRecord = {
           receiptId: createReceiptId(friendId, nextCount),
-          missionId: 'research',
-          missionName: 'Research Mission',
+          missionId: mission.id,
+          missionName: mission.name,
           request,
           completedAt: new Date().toISOString(),
-          rfSpent: 5,
-          rfBurned: 2.5,
+          rfSpent: mission.rfCost,
+          rfBurned: mission.rfCost * 0.5,
           computeAllocation: 2,
           ecosystemAllocation: 0.5,
-          xpEarned: 50,
-          credEarned: 3,
+          xpEarned: mission.xpReward,
+          credEarned: mission.credReward,
         }
 
         set((state) => ({
@@ -99,6 +103,7 @@ export const useProgressionStore = create<ProgressionState>()(
               rfBurned: current.rfBurned + record.rfBurned,
               history: [record, ...current.history],
               installedSkills: current.installedSkills ?? ['deep-research'],
+              skillMastery: { ...(current.skillMastery ?? {}), [mission.skillId]: (current.skillMastery?.[mission.skillId] ?? 0) + (current.installedSkills.includes(mission.skillId) ? 25 : 8) },
               dailyLimit: current.dailyLimit ?? 25,
               perMissionLimit: current.perMissionLimit ?? 10,
               autoApprove: current.autoApprove ?? true,
@@ -117,7 +122,7 @@ export const useProgressionStore = create<ProgressionState>()(
       installSkill: (friendId, skillId, price) => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         if (current.balance < price || current.installedSkills.includes(skillId)) return false
-        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, balance: current.balance - price, rfSpent: current.rfSpent + price, installedSkills: [...current.installedSkills, skillId], transactions: [{ id: `SKILL-${skillId}-${Date.now()}`, type: 'skill', label: 'Skill installed', amount: -price, createdAt: new Date().toISOString() }, ...current.transactions] } } }))
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, balance: current.balance - price, rfSpent: current.rfSpent + price, installedSkills: [...current.installedSkills, skillId], skillMastery: { ...current.skillMastery, [skillId]: 0 }, transactions: [{ id: `SKILL-${skillId}-${Date.now()}`, type: 'skill', label: 'Skill installed', amount: -price, createdAt: new Date().toISOString() }, ...current.transactions] } } }))
         return true
       },
       fundWallet: (friendId, amount) => {
