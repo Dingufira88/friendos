@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { missions } from '../missions/definitions'
+import { skillCatalog } from '../skills/catalog'
 
 export interface MissionRecord {
   receiptId: string
@@ -12,6 +13,10 @@ export interface MissionRecord {
   rfBurned: number
   computeAllocation: number
   ecosystemAllocation: number
+  developerAllocation: number
+  skillId: string
+  skillName: string
+  skillDeveloper: string
   xpEarned: number
   credEarned: number
 }
@@ -69,6 +74,10 @@ function createReceiptId(friendId: string, count: number) {
   return `FOS-${friendId}-${String(count).padStart(4, '0')}`
 }
 
+function rfAmount(value: number) {
+  return Math.round(value * 100) / 100
+}
+
 export const useProgressionStore = create<ProgressionState>()(
   persist(
     (set, get) => ({
@@ -76,6 +85,14 @@ export const useProgressionStore = create<ProgressionState>()(
       completeMission: (friendId, request, missionId = 'research') => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         const mission = missions.find((item) => item.id === missionId) ?? missions[2]
+        const skill = skillCatalog.find((item) => item.id === mission.skillId)
+        const skillInstalled = current.installedSkills.includes(mission.skillId)
+        const developerAllocation = skillInstalled && skill?.developerShare
+          ? rfAmount(mission.rfCost * (skill.developerShare / 100))
+          : 0
+        const rfBurned = rfAmount(mission.rfCost * 0.5)
+        const computeAllocation = rfAmount(mission.rfCost * 0.3)
+        const ecosystemAllocation = rfAmount(mission.rfCost - rfBurned - computeAllocation - developerAllocation)
         const nextCount = current.missionCount + 1
         const record: MissionRecord = {
           receiptId: createReceiptId(friendId, nextCount),
@@ -84,9 +101,13 @@ export const useProgressionStore = create<ProgressionState>()(
           request,
           completedAt: new Date().toISOString(),
           rfSpent: mission.rfCost,
-          rfBurned: mission.rfCost * 0.5,
-          computeAllocation: 2,
-          ecosystemAllocation: 0.5,
+          rfBurned,
+          computeAllocation,
+          ecosystemAllocation,
+          developerAllocation,
+          skillId: mission.skillId,
+          skillName: skill?.name ?? mission.skill,
+          skillDeveloper: developerAllocation ? skill?.developer ?? 'Community developer' : 'FriendOS ecosystem',
           xpEarned: mission.xpReward,
           credEarned: mission.credReward,
         }
