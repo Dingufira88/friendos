@@ -82,6 +82,8 @@ interface ProgressionState {
   completeMission: (friendId: string, request: string, missionId?: string, report?: ResearchReport, parentReceiptId?: string) => MissionRecord
   completeReview: (friendId: string, receiptId: string, action: ReviewAction, instruction: string, result: ResearchReport, usedNativeFallback?: boolean) => MissionReview | null
   acceptMissionVersion: (friendId: string, receiptId: string, version: number, memoryTypes: MemoryType[]) => boolean
+  updateMemory: (friendId: string, memoryId: string, content: string) => boolean
+  deleteMemory: (friendId: string, memoryId: string) => void
   resetFriend: (friendId: string) => void
   installSkill: (friendId: string, skillId: string, price: number) => boolean
   fundWallet: (friendId: string, amount: number) => boolean
@@ -221,6 +223,17 @@ export const useProgressionStore = create<ProgressionState>()(
           memories: [...additions.filter((entry) => !(current.memories ?? []).some((saved) => saved.id === entry.id)), ...(current.memories ?? [])],
         } } }))
         return true
+      },
+      updateMemory: (friendId, memoryId, content) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        const nextContent = content.trim()
+        if (!nextContent || !(current.memories ?? []).some((memory) => memory.id === memoryId)) return false
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, memories: (current.memories ?? []).map((memory) => memory.id === memoryId ? { ...memory, content: nextContent } : memory) } } }))
+        return true
+      },
+      deleteMemory: (friendId, memoryId) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, memories: (current.memories ?? []).filter((memory) => memory.id !== memoryId) } } }))
       },
       resetFriend: (friendId) => set((state) => {
         const friends = { ...state.friends }

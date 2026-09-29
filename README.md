@@ -38,13 +38,13 @@ Implemented:
 - Final-version acceptance and opt-in memory categories: conclusion, preference, rejected direction, and reusable workflow.
 - Linked missions that retain the originating receipt relationship.
 - Operator-specific memory persisted locally and displayed in the complete operator profile.
+- Parent/child mission lineage displayed in history, with completed results reopenable from their receipts.
+- Owner controls to edit or delete individual operator memories.
 
 Remaining before production use:
 
 - Route reviews through a disclosed, consent-aware live AI endpoint. The static Pages build currently uses deterministic local review output.
-- Add dedicated end-to-end coverage for final acceptance, memory selection, and linked-mission creation. Existing tests cover versioned reviews, skill routing, and review economics.
-- Replace rule-based memory extraction with structured semantic extraction and give users controls to edit or delete individual memories.
-- Visualize parent/child mission relationships in mission history and allow reopening an accepted result from its receipt.
+- Replace rule-based memory extraction with structured semantic extraction.
 - Persist review state to a backend or wallet-linked store; browser storage is currently device-local.
 
 ## Why Rare Friends
@@ -148,7 +148,7 @@ To enable live AI on a serverless host, copy `.env.example`, set `OPENAI_API_KEY
 
 ## Deployment
 
-Every push to `main` runs the production build and eighteen desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
+Every push to `main` runs the production build and twenty-two desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
 
 ## Known limitations
 

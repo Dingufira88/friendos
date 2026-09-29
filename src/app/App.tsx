@@ -81,6 +81,8 @@ export function App() {
   const rawInstallSkill = useProgressionStore((state) => state.installSkill);
   const fundWallet = useProgressionStore((state) => state.fundWallet);
   const setWalletPolicy = useProgressionStore((state) => state.setWalletPolicy);
+  const updateMemory = useProgressionStore((state) => state.updateMemory);
+  const deleteMemory = useProgressionStore((state) => state.deleteMemory);
   const identities = useMemo(
     () =>
       wallet.ownedFriends.length
@@ -234,6 +236,16 @@ export function App() {
     );
   }
 
+  function reopenMission(item: MissionRecord) {
+    const version = item.acceptedVersion ?? (item.reviews?.at(-1)?.version ?? 1);
+    const selectedReport = version === 1 ? item.report : item.reviews?.find((review) => review.version === version)?.result;
+    if (!selectedReport) return;
+    setReceipt(item);
+    setReport(selectedReport);
+    setAgentSource("fallback");
+    setOverlay("result");
+  }
+
   return (
     <div
       className={`site view-${view}`}
@@ -339,6 +351,8 @@ export function App() {
           onPolicy={(daily, mission, auto) =>
             setWalletPolicy(friend.tokenId, daily, mission, auto)
           }
+          onUpdateMemory={(memoryId, content) => updateMemory(friend.tokenId, memoryId, content)}
+          onDeleteMemory={(memoryId) => deleteMemory(friend.tokenId, memoryId)}
         />
         <section className="skill-revenue">
           <p className="kicker">
@@ -690,6 +704,11 @@ export function App() {
                       {(item.reviews?.length ?? 0) + 1} ·{" "}
                       {new Date(item.completedAt).toLocaleString()}
                     </small>
+                    <div className="mission-lineage">
+                      {item.acceptedVersion && <span>ACCEPTED V{item.acceptedVersion}</span>}
+                      {item.parentReceiptId && <span>CONTINUES {item.parentReceiptId}</span>}
+                      {item.linkedMissionId && <span>CONTINUED AS {item.linkedMissionId}</span>}
+                    </div>
                   </div>
                   <aside>
                     <b>
@@ -705,6 +724,7 @@ export function App() {
                       +{item.xpEarned} XP · {item.reviews?.length ?? 0} REVIEWS
                     </span>
                     <small>{item.receiptId}</small>
+                    {item.report && <button onClick={() => reopenMission(item)}>OPEN RESULT ↗</button>}
                   </aside>
                 </article>
               ))
@@ -992,6 +1012,8 @@ function AgentProfilePage({
   onBack,
   onFund,
   onPolicy,
+  onUpdateMemory,
+  onDeleteMemory,
 }: {
   friend: ReturnType<typeof createFriendIdentity>;
   progress: FriendProgress;
@@ -1003,6 +1025,8 @@ function AgentProfilePage({
   onBack: () => void;
   onFund: (amount: number) => boolean;
   onPolicy: (daily: number, mission: number, auto: boolean) => void;
+  onUpdateMemory: (memoryId: string, content: string) => boolean;
+  onDeleteMemory: (memoryId: string) => void;
 }) {
   const [fundAmount, setFundAmount] = useState(25);
   const [dailyLimit, setDailyLimit] = useState(progress.dailyLimit);
@@ -1145,7 +1169,7 @@ function AgentProfilePage({
           </div>
           <div className="detail-block operator-memory">
             <small>OPERATOR MEMORY · {(progress.memories ?? []).length}</small>
-            {(progress.memories ?? []).length ? (progress.memories ?? []).map((memory) => <p key={memory.id}><i>✦</i><span><strong>{memory.type.replace('-', ' ').toUpperCase()}</strong>{memory.content}</span><b>{memory.sourceReceiptId}</b></p>) : <p className="no-transactions">Accept a mission result and choose what this operator should remember.</p>}
+            {(progress.memories ?? []).length ? (progress.memories ?? []).map((memory) => <MemoryRow key={memory.id} memory={memory} onUpdate={onUpdateMemory} onDelete={onDeleteMemory} />) : <p className="no-transactions">Accept a mission result and choose what this operator should remember.</p>}
           </div>
           <div className="detail-block transactions">
             <small>WALLET ACTIVITY</small>
@@ -1173,6 +1197,12 @@ function AgentProfilePage({
       </div>
     </section>
   );
+}
+
+function MemoryRow({ memory, onUpdate, onDelete }: { memory: FriendProgress['memories'][number]; onUpdate: (memoryId: string, content: string) => boolean; onDelete: (memoryId: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [content, setContent] = useState(memory.content);
+  return <div className="memory-row"><i>✦</i><div><strong>{memory.type.replace('-', ' ').toUpperCase()}</strong>{editing ? <textarea aria-label={`Edit ${memory.type} memory`} value={content} onChange={(event) => setContent(event.target.value)} /> : <p>{memory.content}</p>}<small>{memory.sourceReceiptId}</small></div><aside>{editing ? <><button onClick={() => { if (onUpdate(memory.id, content)) setEditing(false) }}>SAVE</button><button onClick={() => { setContent(memory.content); setEditing(false) }}>CANCEL</button></> : <><button onClick={() => setEditing(true)}>EDIT</button><button className="delete-memory" onClick={() => onDelete(memory.id)}>DELETE</button></>}</aside></div>;
 }
 
 function WalletSessionCard({
