@@ -724,7 +724,7 @@ export function App() {
                       +{item.xpEarned} XP · {item.reviews?.length ?? 0} REVIEWS
                     </span>
                     <small>{item.receiptId}</small>
-                    {item.report && <button onClick={() => reopenMission(item)}>OPEN RESULT ↗</button>}
+                    {item.report && <button aria-label={`Open result ${item.receiptId}`} onClick={() => reopenMission(item)}>OPEN RESULT ↗</button>}
                   </aside>
                 </article>
               ))

@@ -167,6 +167,6 @@ test('creates visible linked mission lineage and reopens a completed receipt', a
   const history = page.locator('.history-list')
   await expect(history.getByText('CONTINUES FOS-48321-0001')).toBeVisible()
   await expect(history.getByText('CONTINUED AS FOS-48321-0002')).toBeVisible()
-  await history.locator('article').filter({ hasText: 'FOS-48321-0001' }).getByRole('button', { name: /OPEN RESULT/ }).click()
+  await history.getByRole('button', { name: 'Open result FOS-48321-0001' }).click()
   await expect(page.getByText('FOS-48321-0001 / COMPLETE', { exact: true })).toBeVisible()
 })
