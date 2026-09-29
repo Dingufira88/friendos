@@ -75,6 +75,8 @@ export interface FriendProgress {
   autoApprove: boolean
   transactions: WalletTransaction[]
   memories: OperatorMemory[]
+  focus: { role: string; objective: string; outputStyle: string; topicsToAvoid: string }
+  permissions: { allowedMissionIds: string[]; requireConfirmation: boolean }
 }
 
 interface ProgressionState {
@@ -88,6 +90,7 @@ interface ProgressionState {
   installSkill: (friendId: string, skillId: string, price: number) => boolean
   fundWallet: (friendId: string, amount: number) => boolean
   setWalletPolicy: (friendId: string, dailyLimit: number, perMissionLimit: number, autoApprove: boolean) => void
+  setOperatorSettings: (friendId: string, focus: FriendProgress['focus'], permissions: FriendProgress['permissions']) => void
 }
 
 export const initialProgress = (): FriendProgress => ({
@@ -105,6 +108,8 @@ export const initialProgress = (): FriendProgress => ({
   autoApprove: true,
   transactions: [],
   memories: [],
+  focus: { role: 'Independent research operator', objective: 'Turn useful work into verifiable progress.', outputStyle: 'Concise and evidence-led', topicsToAvoid: '' },
+  permissions: { allowedMissionIds: ['quick-ask', 'content', 'research', 'strategy'], requireConfirmation: false },
 })
 
 function createReceiptId(friendId: string, count: number) {
@@ -171,6 +176,8 @@ export const useProgressionStore = create<ProgressionState>()(
               autoApprove: current.autoApprove ?? true,
               transactions: [{ id: record.receiptId, type: 'mission', label: record.missionName, amount: -record.rfSpent, createdAt: record.completedAt }, ...(current.transactions ?? [])],
               memories: current.memories ?? [],
+              focus: current.focus ?? initialProgress().focus,
+              permissions: current.permissions ?? initialProgress().permissions,
             },
           },
         }))
@@ -255,6 +262,10 @@ export const useProgressionStore = create<ProgressionState>()(
       setWalletPolicy: (friendId, dailyLimit, perMissionLimit, autoApprove) => {
         const current = { ...initialProgress(), ...get().friends[friendId] }
         set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, dailyLimit: Math.max(0, dailyLimit), perMissionLimit: Math.max(0, perMissionLimit), autoApprove } } }))
+      },
+      setOperatorSettings: (friendId, focus, permissions) => {
+        const current = { ...initialProgress(), ...get().friends[friendId] }
+        set((state) => ({ friends: { ...state.friends, [friendId]: { ...current, focus, permissions } } }))
       },
     }),
     { name: 'friendos-progression-v1' },

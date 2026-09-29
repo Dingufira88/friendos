@@ -24,6 +24,17 @@ Connecting a wallet adds Robinhood Chain switching through FriendSDK v0.1.2, a f
 8. Accept the strongest version, choose what the operator remembers, or start a linked mission.
 9. Reopen the Friend to see mission history, memory, XP, skill mastery, balance, and wallet activity.
 
+## Operator profile
+
+Each NFT operator has an independent control and intelligence profile with:
+
+- Performance evidence: accepted outputs, review depth, average RF cost, and specialist-confidence usage.
+- A five-stage evolution timeline from Awakened to Legendary.
+- Editable role, current objective, preferred output style, and topics to avoid.
+- Skill impact showing usage and mastery for every installed ability.
+- Memory insights grouped by conclusions, preferences, workflows, and rejected directions.
+- Mission permissions, confirmation policy, daily budget, and per-mission spending limits.
+
 ## Mission Review
 
 Mission Review keeps follow-up work attached to a mission instead of turning FriendOS into a general-purpose chat window.
@@ -144,7 +155,7 @@ npm run test:e2e
 
 ## Deployment
 
-Every push to `main` runs the production build and twenty-four desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
+Every push to `main` runs the production build and twenty-six desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
 
 ## Known limitations
 

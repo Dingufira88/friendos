@@ -81,6 +81,7 @@ export function App() {
   const rawInstallSkill = useProgressionStore((state) => state.installSkill);
   const fundWallet = useProgressionStore((state) => state.fundWallet);
   const setWalletPolicy = useProgressionStore((state) => state.setWalletPolicy);
+  const setOperatorSettings = useProgressionStore((state) => state.setOperatorSettings);
   const updateMemory = useProgressionStore((state) => state.updateMemory);
   const deleteMemory = useProgressionStore((state) => state.deleteMemory);
   const identities = useMemo(
@@ -111,8 +112,10 @@ export function App() {
     guestMode ||
     (activeMission.rfCost <= progress.perMissionLimit &&
       spentToday + activeMission.rfCost <= progress.dailyLimit);
+  const permissionAllows = (progress.permissions ?? initialProgress().permissions).allowedMissionIds.includes(activeMission.id);
   const canLaunch =
     activeMission.available &&
+    permissionAllows &&
     request.trim().length > 2 &&
     canAfford &&
     withinPolicy;
@@ -348,6 +351,7 @@ export function App() {
           onUpdateMemory={(memoryId, content) => updateMemory(friend.tokenId, memoryId, content)}
           onDeleteMemory={(memoryId) => deleteMemory(friend.tokenId, memoryId)}
           onSkills={() => setShowAgentSkills(true)}
+          onSettings={(focus, permissions) => setOperatorSettings(friend.tokenId, focus, permissions)}
         />
         <section className="skill-revenue">
           <p className="kicker">
@@ -1010,6 +1014,7 @@ function AgentProfilePage({
   onUpdateMemory,
   onDeleteMemory,
   onSkills,
+  onSettings,
 }: {
   friend: ReturnType<typeof createFriendIdentity>;
   progress: FriendProgress;
@@ -1024,17 +1029,27 @@ function AgentProfilePage({
   onUpdateMemory: (memoryId: string, content: string) => boolean;
   onDeleteMemory: (memoryId: string) => void;
   onSkills: () => void;
+  onSettings: (focus: FriendProgress['focus'], permissions: FriendProgress['permissions']) => void;
 }) {
   const [fundAmount, setFundAmount] = useState(25);
   const [dailyLimit, setDailyLimit] = useState(progress.dailyLimit);
   const [missionLimit, setMissionLimit] = useState(progress.perMissionLimit);
   const [autoApprove, setAutoApprove] = useState(progress.autoApprove);
+  const [focus, setFocus] = useState(progress.focus ?? initialProgress().focus);
+  const [permissions, setPermissions] = useState(progress.permissions ?? initialProgress().permissions);
   const address =
     friend.walletAddress ??
     `0xFriend${friend.tokenId.padStart(8, "0")}…${friend.tokenId.slice(-4)}`;
   const installed = skillCatalog.filter((skill) =>
     progress.installedSkills.includes(skill.id),
   );
+  const accepted = progress.history.filter((mission) => mission.acceptedVersion).length;
+  const reviewRounds = progress.history.reduce((total, mission) => total + (mission.reviews?.length ?? 0), 0);
+  const allReviews = progress.history.flatMap((mission) => mission.reviews ?? []);
+  const specialistReviews = allReviews.filter((review) => review.confidence === 'specialist').length;
+  const averageCost = progress.missionCount ? Math.round((progress.rfSpent / progress.missionCount) * 10) / 10 : 0;
+  const memoryCounts = (progress.memories ?? []).reduce<Record<string, number>>((counts, memory) => ({ ...counts, [memory.type]: (counts[memory.type] ?? 0) + 1 }), {});
+  const evolutionSteps = [{ level: 1, name: 'AWAKENED', xp: 0 }, { level: 2, name: 'CAPABLE', xp: 100 }, { level: 3, name: 'SPECIALIST', xp: 250 }, { level: 4, name: 'ADVANCED', xp: 500 }, { level: 5, name: 'LEGENDARY', xp: 900 }];
   return (
     <section className="agent-page">
       <button className="back-link" onClick={onBack}>
@@ -1158,7 +1173,7 @@ function AgentProfilePage({
                 <i>{skill.icon}</i>
                 <span>
                   <strong>{skill.name}</strong>
-                  {skill.developer}
+                  {skill.developer} · {progress.history.filter((mission) => mission.skillId === skill.id).length + allReviews.filter((review) => review.skillId === skill.id).length} USES · {progress.skillMastery[skill.id] ?? 0} MASTERY
                 </span>
                 <b>{skill.usageCost} RF / USE</b>
               </p>
@@ -1192,6 +1207,24 @@ function AgentProfilePage({
           </div>
         </article>
       </div>
+      <section className="profile-intelligence">
+        <div className="section-rule"><b>01</b> OPERATOR INTELLIGENCE <span /></div>
+        <div className="performance-grid">
+          <article><small>ACCEPTED OUTPUTS</small><strong>{accepted}</strong><span>{progress.missionCount ? Math.round((accepted / progress.missionCount) * 100) : 0}% acceptance rate</span></article>
+          <article><small>REVIEW DEPTH</small><strong>{reviewRounds}</strong><span>structured review rounds</span></article>
+          <article><small>AVG. MISSION COST</small><strong>{averageCost} RF</strong><span>including review spend</span></article>
+          <article><small>SPECIALIST CONFIDENCE</small><strong>{specialistReviews}</strong><span>of {allReviews.length} reviewed outputs</span></article>
+        </div>
+      </section>
+      <section className="profile-intelligence evolution-panel">
+        <div className="section-rule"><b>02</b> EVOLUTION TIMELINE <span /></div>
+        <div className="evolution-timeline">{evolutionSteps.map((stage) => <article key={stage.level} className={level.level >= stage.level ? 'unlocked' : ''}><b>LV.{stage.level}</b><strong>{stage.name}</strong><span>{stage.xp} XP</span>{level.level === stage.level && <i>CURRENT</i>}</article>)}</div>
+      </section>
+      <section className="profile-settings-grid">
+        <article className="operator-focus"><small>OPERATOR FOCUS</small><h3>Define how {friend.name} should work.</h3><label>ROLE<input aria-label="Operator role" value={focus.role} onChange={(event) => setFocus({ ...focus, role: event.target.value })} /></label><label>CURRENT OBJECTIVE<textarea aria-label="Current objective" value={focus.objective} onChange={(event) => setFocus({ ...focus, objective: event.target.value })} /></label><label>OUTPUT STYLE<select aria-label="Output style" value={focus.outputStyle} onChange={(event) => setFocus({ ...focus, outputStyle: event.target.value })}><option>Concise and evidence-led</option><option>Detailed and analytical</option><option>Bold and creative</option><option>Executive summary first</option></select></label><label>TOPICS TO AVOID<input aria-label="Topics to avoid" value={focus.topicsToAvoid} onChange={(event) => setFocus({ ...focus, topicsToAvoid: event.target.value })} placeholder="Optional" /></label></article>
+        <article className="permissions-center"><small>PERMISSIONS CENTER</small><h3>Choose what this operator may do.</h3><div>{missions.slice(0, 4).map((mission) => <label key={mission.id}><input type="checkbox" checked={permissions.allowedMissionIds.includes(mission.id)} onChange={() => setPermissions({ ...permissions, allowedMissionIds: permissions.allowedMissionIds.includes(mission.id) ? permissions.allowedMissionIds.filter((id) => id !== mission.id) : [...permissions.allowedMissionIds, mission.id] })} />{mission.name}</label>)}</div><label className="confirmation-policy"><input type="checkbox" checked={permissions.requireConfirmation} onChange={(event) => setPermissions({ ...permissions, requireConfirmation: event.target.checked })} /> Require confirmation before every paid action</label><button onClick={() => onSettings(focus, permissions)}>Save focus and permissions</button></article>
+        <article className="memory-insights"><small>MEMORY INSIGHTS</small><h3>What shapes this operator.</h3>{(['conclusion', 'preference', 'workflow', 'rejected-direction'] as const).map((type) => <div key={type}><span>{type.replace('-', ' ').toUpperCase()}</span><strong>{memoryCounts[type] ?? 0}</strong><i style={{ width: `${Math.min(100, (memoryCounts[type] ?? 0) * 25)}%` }} /></div>)}</article>
+      </section>
     </section>
   );
 }
