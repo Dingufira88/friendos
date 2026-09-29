@@ -96,7 +96,7 @@ test('runs distinct guest missions and opens acquired skill mastery', async ({ p
   await expect(page.getByText(/social campaign designed for clarity/)).toBeVisible({ timeout: 15_000 })
   await page.getByRole('button', { name: /Return to workspace/ }).click()
   await page.getByRole('button', { name: 'Agent profile' }).click()
-  await page.getByRole('button', { name: /View all 1 acquired skills/ }).click()
+  await page.locator('.profile-pills').getByRole('button', { name: /1 SKILLS/ }).click()
   await expect(page.getByRole('heading', { name: /Abilities that grow through work/ })).toBeVisible()
   await expect(page.locator('.mastery-list small').filter({ hasText: 'MASTERY XP' })).toBeVisible()
 })

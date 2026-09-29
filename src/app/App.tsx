@@ -331,12 +331,6 @@ export function App() {
       </header>
       <main>
         <WalletSessionCard wallet={wallet} />
-        <button
-          className="agent-skills-open"
-          onClick={() => setShowAgentSkills(true)}
-        >
-          View all {progress.installedSkills.length} acquired skills ↗
-        </button>
         <AgentProfilePage
           key={friend.tokenId}
           friend={friend}
@@ -353,6 +347,7 @@ export function App() {
           }
           onUpdateMemory={(memoryId, content) => updateMemory(friend.tokenId, memoryId, content)}
           onDeleteMemory={(memoryId) => deleteMemory(friend.tokenId, memoryId)}
+          onSkills={() => setShowAgentSkills(true)}
         />
         <section className="skill-revenue">
           <p className="kicker">
@@ -762,7 +757,7 @@ export function App() {
         </div>
         <p>THE OPERATING SYSTEM FOR YOUR FRIEND</p>
         <strong>Your Friend can think, work, and spend.</strong>
-        <small>VIBEATHON PROTOTYPE · RF SPENDING AND BURNS ARE SIMULATED</small>
+        <small>RF SPENDING AND BURNS ARE SIMULATED</small>
       </footer>
       <MissionOverlay
         overlay={overlay}
@@ -1014,6 +1009,7 @@ function AgentProfilePage({
   onPolicy,
   onUpdateMemory,
   onDeleteMemory,
+  onSkills,
 }: {
   friend: ReturnType<typeof createFriendIdentity>;
   progress: FriendProgress;
@@ -1027,6 +1023,7 @@ function AgentProfilePage({
   onPolicy: (daily: number, mission: number, auto: boolean) => void;
   onUpdateMemory: (memoryId: string, content: string) => boolean;
   onDeleteMemory: (memoryId: string) => void;
+  onSkills: () => void;
 }) {
   const [fundAmount, setFundAmount] = useState(25);
   const [dailyLimit, setDailyLimit] = useState(progress.dailyLimit);
@@ -1063,7 +1060,7 @@ function AgentProfilePage({
           <div className="profile-pills">
             <span>{progress.missionCount} MISSIONS</span>
             <span>{progress.xp} XP</span>
-            <span>{installed.length} SKILLS</span>
+            <button onClick={onSkills}>{installed.length} SKILLS ↗</button>
           </div>
         </div>
         <label>
