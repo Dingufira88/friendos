@@ -163,7 +163,7 @@ test('installs a routed specialist and credits its review usage', async ({ page 
   await expect(page.locator('.skill-route')).toHaveCount(0)
   await page.getByLabel('Follow-up instruction').fill('Make the announcement shorter and more specific')
   await page.getByRole('button', { name: /SEND BACK TO SIGNAL/ }).click()
-  await expect(page.getByText('SPECIALIST CONFIDENCE')).toBeVisible({ timeout: 5_000 })
+  await expect(page.locator('.review-receipt').getByText('SPECIALIST CONFIDENCE')).toBeVisible({ timeout: 5_000 })
   await expect(page.getByText('0.4 RF CREATOR')).toBeVisible()
   await expect(page.locator('.review-receipt').getByText('+10 MASTERY', { exact: true })).toBeVisible()
 })
