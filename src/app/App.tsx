@@ -580,7 +580,7 @@ export function App() {
                   <strong>{progress.balance - activeMission.rfCost} RF</strong>
                 </span>
               </div>
-              <button disabled={!canLaunch} onClick={launchMission}>
+              <button className={canLaunch ? "ready" : ""} disabled={!canLaunch} onClick={launchMission}>
                 Launch mission ↗
               </button>
             </div>
@@ -1561,9 +1561,11 @@ function MissionOverlay({
                 <button className="overlay-close" onClick={onClose}>
                   ×
                 </button>
-                <div className="working-avatar">
-                  <OperatorAvatar friend={friend} />
-                  <span />
+                <div className="working-scene" aria-label={`${friend.name} working at their operator desk`}>
+                  <div className="task-cloud"><i>✦</i><i>◆</i><i>▦</i></div>
+                  <div className="desk-monitor"><div><OperatorAvatar friend={friend} compact /></div><span /></div>
+                  <div className="desk-operator"><OperatorAvatar friend={friend} /></div>
+                  <div className="pixel-desk"><i /><b /><span /></div>
                 </div>
                 <p className="micro">MISSION IN PROGRESS</p>
                 <h2>
@@ -1706,8 +1708,9 @@ function MissionReviewPanel({
   onAccept: (version: number, memories: MemoryType[]) => void;
   onContinue: () => void;
 }) {
+  const defaultInstruction = (next: ReviewAction) => next === "clarify" ? "Explain the strongest claim, its evidence, and the assumption that could change it." : next === "challenge" ? "Test this result against the strongest credible counterargument and identify what does not hold." : "Improve this result into a clearer, more specific deliverable while preserving its strongest evidence.";
   const [action, setAction] = useState<ReviewAction>("clarify");
-  const [instruction, setInstruction] = useState("");
+  const [instruction, setInstruction] = useState(() => defaultInstruction("clarify"));
   const [nativeApproved, setNativeApproved] = useState(false);
   const [selectedVersion, setSelectedVersion] = useState(receipt?.acceptedVersion ?? (receipt?.reviews?.length ?? 0) + 1);
   const [memoryTypes, setMemoryTypes] = useState<MemoryType[]>(["conclusion", "workflow"]);
@@ -1721,6 +1724,7 @@ function MissionReviewPanel({
   const latest = reviews.at(-1);
   const selectAction = (next: ReviewAction) => {
     setAction(next);
+    setInstruction(defaultInstruction(next));
     setNativeApproved(false);
   };
   return (
@@ -1854,7 +1858,7 @@ function MissionReviewPanel({
               disabled={reviewing || !ready || instruction.trim().length < 3}
               onClick={() => {
                 onReview(action, instruction, !specialistInstalled);
-                setInstruction("");
+                setInstruction(defaultInstruction(action));
                 setNativeApproved(false);
               }}
             >

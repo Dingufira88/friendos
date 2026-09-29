@@ -83,9 +83,8 @@ Guest or wallet owner
         |
         v
 FriendOS React UI
-   |          |-----------------------> Mission API (serverless hosts)
-   |          |                             |-- OpenAI Responses API
-   |          |                             `-- Deterministic offline reports
+   |          |-----------------------> Mission engine
+   |                                        `-- Deterministic task-specific reports
    |          |
    |          |-----------------------> Mission Review
    |                                        |-- Versioned clarify/challenge/refine
@@ -103,7 +102,7 @@ FriendOS React UI
                                       `-- Read-only RF balance
 ```
 
-The GitHub Pages demo is static and uses deterministic offline mission and review reports. `api/mission.ts` is available for serverless mission execution configured with `OPENAI_API_KEY`; a live review endpoint is not yet enabled.
+The GitHub Pages demo uses deterministic, task-specific mission and review reports so the complete product flow remains available without external services.
 
 ## FriendSDK integration
 
@@ -125,7 +124,6 @@ FriendOS is a standalone agent/tool rather than a sandboxed SDK game, so it uses
 - Zustand persistence
 - Framer Motion
 - Zod validation
-- Optional OpenAI Responses API serverless function
 - Playwright desktop and mobile browser tests
 
 ## Run locally
@@ -144,11 +142,9 @@ npm run build
 npm run test:e2e
 ```
 
-To enable live AI on a serverless host, copy `.env.example`, set `OPENAI_API_KEY`, and optionally set `OPENAI_MODEL`. Never expose the key through a `VITE_` environment variable.
-
 ## Deployment
 
-Every push to `main` runs the production build and twenty-two desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
+Every push to `main` runs the production build and twenty-four desktop/mobile browser journeys before publishing `dist/` through GitHub Pages.
 
 ## Known limitations
 

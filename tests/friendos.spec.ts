@@ -23,6 +23,20 @@ test('separates the first-visit tour from optional wallet connection', async ({ 
   await expect(walletModal.getByText(/missions, skills, RF spending, burns, rewards, and progression/i)).toBeVisible()
 })
 
+test('turns suggested briefs and structured follow-ups into immediately usable actions', async ({ page }) => {
+  await page.getByRole('button', { name: /Research the future of onchain games/ }).click()
+  await expect(page.getByLabel('Tell your Friend what you need')).toHaveValue('Research the future of onchain games')
+  const launch = page.getByRole('button', { name: /Launch mission/ })
+  await expect(launch).toBeEnabled()
+  await expect(launch).toHaveClass(/ready/)
+  await launch.click()
+  await expect(page.locator('.working-scene')).toBeVisible()
+  await expect(page.locator('.working-scene')).toHaveAttribute('aria-label', /Signal working at their operator desk/)
+  await expect(page.locator('.mission-review')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByLabel('Follow-up instruction')).not.toHaveValue('')
+  await expect(page.getByRole('button', { name: /SEND BACK TO SIGNAL/ })).toBeEnabled()
+})
+
 test('completes a Research Mission from the unified workspace', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'Your Rare Friend, your new operator.' })).toBeVisible()
   await page.getByLabel('Tell your Friend what you need').fill('Explain the strongest opportunities for Rare Friends builders.')
